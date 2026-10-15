@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 11/20 completed
+**SIs:** 12/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -113,9 +113,13 @@
   - `prettier --write` and the ESLint `prettier/prettier` rule disagreed on one block of the e2e file (`update(...)` call wrapping); `eslint --fix` resolved it, and both now pass.
 
 ### SI-03.11 — Endpoint POST /videos/:id/upload/part-urls (URLs pré-assinadas de partes)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 37 passing in `video-uploads.service.spec.ts` + `video-uploads.service.integration-spec.ts` (8 new unit cases, 1 new integration case against real MinIO); e2e 10 passing (`test/videos-upload-part-urls.e2e-spec.ts` 6, derived from `specs/videos-upload-part-urls.plan.md`, + the updated `test/videos-upload-status.e2e-spec.ts` 4); 0 leftover multipart uploads
+- **Observations:**
+  - **Maestro request applied:** `test/videos-upload-status.e2e-spec.ts` scenario `lista-partes-ja-enviadas` now gets its URLs from `POST /videos/:id/upload/part-urls` instead of signing them through `StorageService`, matching the original test plan (the SI-03.10 deviation is gone).
+  - `expires_in` is the `expiresIn` that `StorageService.presignUploadPart` reports for the first URL; every URL in a batch is signed with the same configured TTL. The method relies on the DTO's `@ArrayMinSize(1)` for a non-empty batch.
+  - The part-count check reuses the private `uploadPlan(declared_size)` and runs after the ownership/draft guard, so a non-owner asking for part 99 still gets 404.
+  - Scenario 1.3 (TTL=600) compiles a second `AppModule` instance after setting `process.env.S3_UPLOAD_PART_URL_TTL_SECONDS = '600'`. The `registerAs` factories read `process.env` at compile time, so the new value applies; the original is restored in that block's `afterAll`. The e2e file has a local `createApp()` to build both instances with the `main.ts` global config.
 
 ### SI-03.15 — VideoProcessingService: extração de metadados e geração de thumbnail
 - **Status:** pending

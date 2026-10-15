@@ -102,14 +102,12 @@ describe('videos-upload-status', () => {
   });
 
   test('lista-partes-ja-enviadas', async () => {
-    // POST /videos/:id/upload/part-urls arrives in SI-03.11; the same public
-    // client signs the URLs here
-    const key = videoOriginalKey(video.id);
-    const urls = await Promise.all(
-      [1, 3].map((partNumber) =>
-        storage.presignUploadPart(key, video.uploadId, partNumber),
-      ),
-    );
+    const partUrls = await request(app.getHttpServer())
+      .post(`/videos/${video.id}/upload/part-urls`)
+      .set('Authorization', `Bearer ${owner.access_token}`)
+      .send({ part_numbers: [1, 3] })
+      .expect(200);
+    const urls = partUrls.body.parts as { url: string }[];
     expect(urls).toHaveLength(2);
 
     for (const [{ url }, size] of [

@@ -19,7 +19,9 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
+import { CreatePartUrlsDto } from './dto/create-part-urls.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
+import { PartUrlsResponseDto } from './dto/part-urls-response.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UploadStatusResponseDto } from './dto/upload-status-response.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
@@ -149,5 +151,52 @@ export class VideosController {
   ): Promise<UploadStatusResponseDto> {
     const status = await this.videoUploadsService.getUploadStatus(user.sub, id);
     return UploadStatusResponseDto.from(status);
+  }
+
+  @Post(':id/upload/part-urls')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get presigned part upload URLs',
+    description:
+      'Signs UploadPart URLs for a batch of up to 100 parts. The client PUTs each part straight to object storage, so the video bytes never pass through the API.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned URLs, in the requested order, and their validity',
+    type: PartUrlsResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'VALIDATION_ERROR (invalid body or `id`) or INVALID_PART_NUMBER (a part number above part_count)',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'VIDEO_NOT_FOUND — the video does not exist or belongs to another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'INVALID_VIDEO_STATUS — the video is no longer a draft',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async createPartUrls(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreatePartUrlsDto,
+  ): Promise<PartUrlsResponseDto> {
+    const result = await this.videoUploadsService.presignParts(
+      user.sub,
+      id,
+      dto.part_numbers,
+    );
+    return PartUrlsResponseDto.from(result);
   }
 }

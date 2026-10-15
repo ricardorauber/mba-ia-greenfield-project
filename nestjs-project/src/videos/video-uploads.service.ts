@@ -7,6 +7,7 @@ import type { CreateVideoDto } from './dto/create-video.dto';
 import { type Video, VideoStatus } from './entities/video.entity';
 import {
   ChannelNotFoundException,
+  InvalidPartNumberException,
   InvalidVideoStatusException,
   UnsupportedVideoFormatException,
   VideoTooLargeException,
@@ -37,6 +38,16 @@ export interface UploadedPartStatus {
 
 export interface UploadStatus extends UploadPlan {
   uploaded_parts: UploadedPartStatus[];
+}
+
+export interface PartUrl {
+  part_number: number;
+  url: string;
+}
+
+export interface PartUrls {
+  expires_in: number;
+  parts: PartUrl[];
 }
 
 /** Upload flow: the API only coordinates; the bytes go straight to storage. */
@@ -115,6 +126,39 @@ export class VideoUploadsService {
       uploaded_parts: parts.map((part) => ({
         part_number: part.partNumber,
         size: part.size,
+      })),
+    };
+  }
+
+  /**
+   * Presigned UploadPart URLs (public endpoint) for a batch of parts; the
+   * client PUTs each part straight to storage (TD-05, TD-07).
+   * `partNumbers` is non-empty: the DTO enforces 1..100 unique items.
+   */
+  async presignParts(
+    userId: string,
+    id: string,
+    partNumbers: number[],
+  ): Promise<PartUrls> {
+    const video = await this.findOwnedDraftOrFail(userId, id);
+    const { part_count } = this.uploadPlan(video.declared_size);
+    if (partNumbers.some((partNumber) => partNumber > part_count)) {
+      throw new InvalidPartNumberException();
+    }
+
+    const key = videoOriginalKey(id);
+    const signed = await Promise.all(
+      partNumbers.map((partNumber) =>
+        this.storageService.presignUploadPart(key, video.upload_id, partNumber),
+      ),
+    );
+
+    return {
+      // Every URL of the batch is signed with the same configured TTL
+      expires_in: signed[0].expiresIn,
+      parts: signed.map(({ url }, index) => ({
+        part_number: partNumbers[index],
+        url,
       })),
     };
   }

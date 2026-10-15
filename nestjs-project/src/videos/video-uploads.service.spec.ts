@@ -5,6 +5,7 @@ import type { CreateVideoDto } from './dto/create-video.dto';
 import { type Video, VideoStatus } from './entities/video.entity';
 import {
   ChannelNotFoundException,
+  InvalidPartNumberException,
   InvalidVideoStatusException,
   UnsupportedVideoFormatException,
   VideoNotFoundException,
@@ -23,6 +24,7 @@ describe('VideoUploadsService', () => {
     createMultipartUpload: jest.Mock;
     abortMultipartUpload: jest.Mock;
     listParts: jest.Mock;
+    presignUploadPart: jest.Mock;
   };
   let service: VideoUploadsService;
   const channel = { id: 'channel-id' } as Channel;
@@ -45,6 +47,7 @@ describe('VideoUploadsService', () => {
       createMultipartUpload: jest.fn().mockResolvedValue('upload-id'),
       abortMultipartUpload: jest.fn().mockResolvedValue(undefined),
       listParts: jest.fn(),
+      presignUploadPart: jest.fn(),
     };
     service = new VideoUploadsService(
       videosService as unknown as VideosService,
@@ -270,5 +273,89 @@ describe('VideoUploadsService', () => {
         expect(status.part_count).toBe(parts);
       },
     );
+  });
+
+  describe('presignParts', () => {
+    const draft = (overrides: Partial<Video> = {}): Video =>
+      ({
+        id: 'video-id',
+        status: VideoStatus.Draft,
+        // 3 parts of 64 MiB (the last one is 1 byte)
+        declared_size: 2 * 64 * MIB + 1,
+        upload_id: 'upload-id',
+        ...overrides,
+      }) as Video;
+
+    beforeEach(() => {
+      storageService.presignUploadPart.mockImplementation(
+        (_key: string, _uploadId: string, partNumber: number) =>
+          Promise.resolve({
+            url: `https://signed/${partNumber}`,
+            expiresIn: 900,
+          }),
+      );
+    });
+
+    it('should reject a part number above part_count', async () => {
+      videosService.findOwnedOrFail.mockResolvedValue(draft());
+
+      await expect(
+        service.presignParts('user-id', 'video-id', [1, 4]),
+      ).rejects.toBeInstanceOf(InvalidPartNumberException);
+      expect(storageService.presignUploadPart).not.toHaveBeenCalled();
+    });
+
+    it('should accept the last part number', async () => {
+      videosService.findOwnedOrFail.mockResolvedValue(draft());
+
+      await expect(
+        service.presignParts('user-id', 'video-id', [3]),
+      ).resolves.toMatchObject({ parts: [{ part_number: 3 }] });
+    });
+
+    it.each([VideoStatus.Processing, VideoStatus.Ready, VideoStatus.Failed])(
+      'should reject a video in %s',
+      async (status) => {
+        videosService.findOwnedOrFail.mockResolvedValue(draft({ status }));
+
+        await expect(
+          service.presignParts('user-id', 'video-id', [1]),
+        ).rejects.toBeInstanceOf(InvalidVideoStatusException);
+      },
+    );
+
+    it('should check ownership before the part range', async () => {
+      videosService.findOwnedOrFail.mockRejectedValue(
+        new VideoNotFoundException(),
+      );
+
+      await expect(
+        service.presignParts('user-id', 'video-id', [99]),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+
+    it('should sign the video original upload and keep the requested order', async () => {
+      videosService.findOwnedOrFail.mockResolvedValue(draft());
+
+      const result = await service.presignParts('user-id', 'video-id', [3, 1]);
+
+      expect(storageService.presignUploadPart).toHaveBeenCalledWith(
+        'videos/video-id/original',
+        'upload-id',
+        3,
+      );
+      expect(result.parts).toEqual([
+        { part_number: 3, url: 'https://signed/3' },
+        { part_number: 1, url: 'https://signed/1' },
+      ]);
+    });
+
+    it('should report the TTL the storage signed the URLs with', async () => {
+      videosService.findOwnedOrFail.mockResolvedValue(draft());
+
+      const result = await service.presignParts('user-id', 'video-id', [1]);
+
+      expect(result.expires_in).toBe(900);
+    });
   });
 });

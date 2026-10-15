@@ -131,4 +131,28 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
       ],
     });
   });
+
+  it('should sign part URLs that accept a 5 MiB PUT listed afterwards', async () => {
+    const { user } = await createChannelOwner();
+    const { video } = await uploads.initiate(user.id, {
+      file_name: 'clip.mp4',
+      mime_type: 'video/mp4',
+      size: 2 * 67108864 + 1,
+    });
+    createdUploads.set(video.id, video.upload_id);
+
+    const { parts } = await uploads.presignParts(user.id, video.id, [1]);
+    const res = await fetch(parts[0].url, {
+      method: 'PUT',
+      body: new Uint8Array(randomBytes(5 * 1024 * 1024)),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('etag')).toBeTruthy();
+    await expect(
+      storage.listParts(videoOriginalKey(video.id), video.upload_id),
+    ).resolves.toEqual([
+      expect.objectContaining({ partNumber: 1, size: 5 * 1024 * 1024 }),
+    ]);
+  });
 });
