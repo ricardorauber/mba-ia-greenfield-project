@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 19/20 completed
+**SIs:** 20/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -200,6 +200,12 @@
   - The "distinct slugs" check is its own final test over the 3 videos the file creates; it relies on Jest's in-file test order.
 
 ### SI-03.20 — Documentação: seção de vídeos nos CLAUDE.md e estratégia de testes de storage/fila
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (documentation). Verified instead: a script cross-checked the 78 names cited in the new sections (paths, env vars, Compose services, npm scripts, routes, queue/job/scheduler names, literals) against the repository, and all are present (2 flags were checker false positives on relative paths, confirmed by hand). On a stack recreated with `docker compose up -d --force-recreate`, the 4 documented readiness commands succeed with exactly the documented outputs (`minio`/`redis` healthy, `minio-init` `Exited (0)`, `PONG`, "Bucket created successfully `local/streamtube-videos`.", "Video worker ready, consuming video-processing").
+- **Observations:**
+  - `nestjs-project/CLAUDE.md` ends with `## Videos`: services/ports, readiness checks, env var table (`S3_*`, `REDIS_*`, `QUEUE_PREFIX`), the HTTP flow with the real routes, the worker (queues, scheduler, `start:worker` / `start:worker:dev` and the `exec` graceful-shutdown note), the `openapi:export` build note, test isolation and production notes (AWS without `S3_ENDPOINT`, bucket CORS with `ETag` exposed, `AbortIncompleteMultipartUpload` lifecycle rule).
+  - Root `CLAUDE.md`: `Message Queue (TBD)` → `Message Queue (BullMQ on Redis)`; it ends with `## Videos` (architecture summary + link to the phase plan).
+  - Accuracy fixes made while cross-checking the draft: readiness uses `docker compose ps -a` (plain `ps` hides the exited `minio-init`); the CORS `ETag` rationale corrected (the API takes ETags from `ListParts`, the client never sends them back); the `nestjs-api` dependency sentence keeps `db`/`mailpit`.
+  - Testing guide: `references/external-systems.md` now has "Object Storage — Real (MinIO in Docker)" and "Message Queue — Real (BullMQ on Redis in Docker)" with the patterns this phase actually uses (bucket from `minio-init`, `deletePrefix` cleanup, ranged GET instead of HEAD on presigned URLs, per-file unique `QUEUE_PREFIX`, obliterating both queues, producer-only modules to observe jobs, the ESM transform). Three other stale "local filesystem/adapter" mentions were updated too (`SKILL.md` §2 and §3 table, `artifacts/services.md` decision table and VideosService example), so no part of the guide recommends filesystem storage any more.
+  - Not touched (out of scope, noted): other `localhost` fallbacks in the testing guide's DB/Mailpit snippets (e.g. `process.env.DB_HOST ?? 'localhost'`) contradict the root CLAUDE.md "Docker Networking" rule; aligning them would be a separate task.
+  - `--force-recreate` was used instead of `down`/`up` because the `db` service has no named volume; recreation keeps its anonymous volume, so the dev DB kept its 3 migrations.
