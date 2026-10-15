@@ -8,6 +8,7 @@ export const S3_ERROR_NAMES = {
   NO_SUCH_UPLOAD: 'NoSuchUpload',
   NO_SUCH_KEY: 'NoSuchKey',
   NOT_FOUND: 'NotFound',
+  ENTITY_TOO_SMALL: 'EntityTooSmall',
 } as const;
 
 export const INTERNAL_GET_URL_TTL_SECONDS = 3600;

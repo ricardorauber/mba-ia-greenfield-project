@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelsService } from '../channels/channels.service';
+import { isS3Error } from '../storage/s3-errors';
+import { S3_ERROR_NAMES } from '../storage/storage.constants';
 import type { UploadedPart } from '../storage/storage.service';
 import { StorageService } from '../storage/storage.service';
 import { VideoProcessingProducer } from '../video-processing/video-processing.producer';
@@ -191,11 +193,20 @@ export class VideoUploadsService {
     // completed it and failed before the status change; the object decides
     if (parts !== null) {
       this.assertAllPartsUploaded(parts, video.declared_size);
-      await this.storageService.completeMultipartUpload(
-        key,
-        video.upload_id,
-        parts,
-      );
+      try {
+        await this.storageService.completeMultipartUpload(
+          key,
+          video.upload_id,
+          parts,
+        );
+      } catch (err) {
+        // A non-last part under the S3 minimum (5 MiB): the client must
+        // re-upload it, so the draft and the open upload are kept
+        if (isS3Error(err, S3_ERROR_NAMES.ENTITY_TOO_SMALL)) {
+          throw new UploadIncompleteException();
+        }
+        throw err;
+      }
     }
 
     const stored = await this.storageService.headObject(key);

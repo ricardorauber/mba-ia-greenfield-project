@@ -1,3 +1,4 @@
+import { S3ServiceException } from '@aws-sdk/client-s3';
 import type { ChannelsService } from '../channels/channels.service';
 import type { Channel } from '../channels/entities/channel.entity';
 import type { StorageService } from '../storage/storage.service';
@@ -462,6 +463,41 @@ describe('VideoUploadsService', () => {
         service.complete('user-id', 'video-id'),
       ).rejects.toBeInstanceOf(UploadIncompleteException);
       expect(storageService.completeMultipartUpload).not.toHaveBeenCalled();
+    });
+
+    it('should map a too-small part rejected by storage to UploadIncompleteException and keep the draft', async () => {
+      storageService.completeMultipartUpload.mockRejectedValue(
+        new S3ServiceException({
+          name: 'EntityTooSmall',
+          $fault: 'client',
+          $metadata: { httpStatusCode: 400 },
+          message:
+            'Your proposed upload is smaller than the minimum allowed size',
+        }),
+      );
+
+      await expect(
+        service.complete('user-id', 'video-id'),
+      ).rejects.toBeInstanceOf(UploadIncompleteException);
+      expect(storageService.deleteObject).not.toHaveBeenCalled();
+      expect(storageService.abortMultipartUpload).not.toHaveBeenCalled();
+      expect(videosService.markFailed).not.toHaveBeenCalled();
+      expect(videosService.markProcessing).not.toHaveBeenCalled();
+      expect(processingProducer.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('should rethrow other storage errors from the assembly unchanged', async () => {
+      const storageError = new S3ServiceException({
+        name: 'InternalError',
+        $fault: 'server',
+        $metadata: { httpStatusCode: 500 },
+      });
+      storageService.completeMultipartUpload.mockRejectedValue(storageError);
+
+      await expect(service.complete('user-id', 'video-id')).rejects.toBe(
+        storageError,
+      );
+      expect(videosService.markProcessing).not.toHaveBeenCalled();
     });
 
     it('should continue when the upload was already assembled and the object exists', async () => {
