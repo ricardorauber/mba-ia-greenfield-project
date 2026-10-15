@@ -1,0 +1,895 @@
+=== session ddb93ee6-cb25-4fc6-a743-dbd9f6591f6f model=claude-opus-5-5 cwd=/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube
+● Bash(ls docs docs/decisions docs/phases docs/tasks 2>/dev/null; ls; ls nestjs-project; cat nestjs-project/package.json)
+  ⎿  docs:
+     decisions
+     design-system-ai-implementable.md
+     design-system-pillars.md
+     diagrams
+     figma-audit.json
+     inventories
+     phases
+     project-plan.md
+     tasks
+     
+     docs/decisions:
+     technical-decisions-next-frontend-config-base.md
+     technical-decisions-next-frontend-msw-foundation.md
+     technical-decisions-next-frontend-openapi-typing.md
+     technical-decisions-openapi-docs-nestjs.md
+     technical-decisions-phase-01-configuracao-base.md
+     technical-decisions-phase-02-auth-frontend.md
+     technical-decisions-phase-02-auth.md
+     
+     docs/phases:
+     phase-01-configuracao-base
+     phase-02-auth
+     phase-02-auth-frontend
+     
+     docs/tasks:
+     task-next-frontend-config-base
+     task-next-frontend-msw-foundation
+     task-next-frontend-openapi-typing
+     task-openapi-docs-nestjs
+     CLAUDE.md
+     FC Tube sem padrão.fig
+     FC Tube.fig
+     README.md
+     _claude-sessions
+     docs
+     mcp.example.py
+     nestjs-project
+     next-frontend
+     scripts
+     skills-lock.json
+     whiteboard.svg
+     CLAUDE.md
+     Dockerfile.dev
+     README.md
+     api.http
+     compose.yaml
+     dist
+     eslint.config.mjs
+     nest-cli.json
+     node_modules
+     openapi.json
+     package-lock.json
+     package.json
+     src
+     test
+     tsconfig.build.json
+     tsconfig.json
+     {
+       "name": "nestjs-project",
+       "version": "0.0.1",
+       "description": "",
+       "author": "",
+       "private": true,
+       "license": "UNLICENSED",
+       "scripts": {
+         "build": "nest build",
+         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+         "start": "nest start",
+         "start:dev": "nest start --watch",
+         "start:debug": "nest start --debug --watch",
+         "start:prod": "node dist/main",
+         "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+         "test": "jest",
+         "test:watch": "jest --watch",
+         "test:cov": "jest --coverage",
+         "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+         "test:integration": "jest --runInBand --testRegex=\"\\.integration-spec\\.ts$\"",
+         "test:e2e": "jest --config ./test/jest-e2e.json",
+         "typeorm": "typeorm-ts-node-commonjs",
+         "migration:run": "npm run typeorm -- migration:run -d src/database/data-source.ts",
+          … (+2157 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/project-plan.md)
+  ⎿  1	# StreamTube — Planejamento Geral do Projeto
+     2	
+     3	## 1. Visão Geral
+     4	
+     5	O StreamTube é uma plataforma de compartilhamento de vídeos onde usuários cadastrados podem fazer upload, gerenciar e publicar vídeos. Usuários anônimos podem assistir livremente, enquanto funcionalidades sociais como comentários, inscrições e likes são exclusivas de usuários autenticados.
+     6	
+     7	### Principais Características
+     8	
+     9	- **Acesso anônimo:** qualquer pessoa pode assistir vídeos sem cadastro.
+     10	- **Cadastro com confirmação:** registro via e-mail com confirmação obrigatória. O prefixo do e-mail se torna o nome do canal.
+     11	- **Upload robusto:** suporte a arquivos de até 10GB sem impactar a performance do sistema.
+     12	- **Gerenciamento de vídeos:** rascunhos, edição de informações, visibilidade pública/unlisted, thumbnails customizadas.
+     13	- **Interações sociais:** likes/dislikes, comentários com respostas, inscrição em canais.
+     14	- **Canais:** cada usuário possui um canal com página pública e painel de administração.
+     15	- **Recuperação de senha:** fluxo completo de reset via e-mail.
+     16	- **Sugestões:** vídeos relacionados por categoria exibidos na sidebar.
+     17	
+     18	### Stack Tecnológica
+     19	
+     20	- **Frontend:** Next.js
+     21	- **Backend:** Nest.js
+     22	- **Banco de dados:** PostgreSQL
+     23	
+     24	---
+     25	
+     26	## 2. Arquitetura do Software
+     27	
+     28	Veja o diagrama de arquitetura do projeto: [software-arch.mermaid](diagrams/software-arch.mermaid)
+     29	
+     30	---
+     31	
+     32	## 3. Fases do Projeto
+     33	
+     34	### Fase 01 — Configuração Base do Projeto
+     35	
+     36	Preparação de toda a fundação do projeto: repositório, ambiente de desenvolvimento, projetos Next.js e Nest.js, banco de dados PostgreSQL e serviços auxiliares.
+     37	
+     38	- Repositório com estrutura de monorepo (frontend e backend)
+     39	- Projeto Next.js (frontend) (será criado depois, não agora) e Nest.js (backend) inicializados
+     40	- Ambiente de desenvolvimento local com todos os serviços via Docker Compose
+     41	- Estrutura inicial do banco de dados PostgreSQL (schema, mi … (+6253 chars)
+● Bash(cat docs/diagrams/software-arch.mermaid; echo ----; cat nestjs-project/compose.yaml; echo ----; cat nestjs-project/CLAUDE.md; echo ---; ls -R nestjs-project/src | head -120; cat nestjs-project/.env.example 2>/dev/null; ls -a nestjs-project)
+  ⎿  C4Container
+         title Container diagram for StreamTube
+     
+         Person(anonUser, "Anonymous User", "Watches videos without login")
+         Person(authUser, "Authenticated User", "Watches, uploads, comments and subscribes")
+     
+         Container_Boundary(c1, "StreamTube") {
+             Container(frontend, "Frontend", "Next.js", "Platform interface")
+             Container(api, "API", "Nest.js", "Business rules and authentication")
+             Container(worker, "Video Worker", "FFmpeg", "Processes videos in background")
+             ContainerDb(db, "Database", "PostgreSQL", "Users, channels, videos, comments, likes")
+             ContainerDb(storage, "Object Storage", "S3 or MinIO", "Video files and thumbnails")
+             ContainerQueue(queue, "Message Queue", "TBD", "Enqueues video processing jobs")
+         }
+     
+         System_Ext(email, "Email Service", "Account confirmation and password recovery")
+     
+         Rel(anonUser, frontend, "Uses", "HTTPS")
+         Rel(authUser, frontend, "Uses", "HTTPS")
+         Rel(frontend, api, "Calls", "REST")
+         Rel(frontend, storage, "Streams", "HTTPS")
+     
+         Rel(api, db, "Reads/Writes")
+         Rel(api, storage, "Uploads")
+         Rel(api, queue, "Publishes job")
+         Rel(api, email, "Sends email", "SMTP")
+     
+         Rel(queue, worker, "Delivers job")
+         Rel(worker, storage, "Reads/Saves")
+         Rel(worker, db, "Updates")
+     
+         UpdateElementStyle(anonUser, $bgColor="#37474F", $fontColor="#ECEFF1", $borderColor="#78909C")
+         UpdateElementStyle(authUser, $bgColor="#37474F", $fontColor="#ECEFF1", $borderColor="#78909C")
+         UpdateElementStyle(frontend, $bgColor="#00BCD4", $fontColor="#FFFFFF", $borderColor="#0097A7")
+         UpdateElementStyle(api, $bgColor="#FF7043", $fontColor="#FFFFFF", $borderColor="#E64A19")
+         UpdateElementStyle(worker, $bgColor="#AB47BC", $fontColor="#FFFFFF", $borderColor="#8E24AA")
+         UpdateElementStyle(db, $bgColor="#42A5F5", $fontColor="#FFFFFF", $borderColor="#1E88E5")
+         UpdateElementStyle(storage, $bgColor="#66BB6A", $fontColor="#FFFFFF", $borderColor="#43A047")
+         UpdateElementStyle … (+12810 chars)
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions && for f in *.md; do echo "=== $f"; head -12 "$f"; grep -nE '^## TD|^\*\*Decision:\*\*|^\*\*Scope' "$f"; done)
+  ⎿  === technical-decisions-next-frontend-config-base.md
+     ---
+     scope_type: ad-hoc
+     related_phases: []
+     status: decided
+     date: 2026-05-13
+     scope_description: "Foundation for environment variable configuration and validation in the next-frontend subproject: validation library, server/client boundary enforcement strategy, and the initial canonical env-key contract for the FE↔BE bridge."
+     ---
+     
+     # Technical Decisions — next-frontend Config Base
+     
+     _Subprojects in scope:_
+     
+     20:## TD-01: Validation Library for Env Schema
+     22:**Scope:** Frontend
+     65:**Decision:** **A (Zod 4)**
+     70:## TD-02: Server/Client Boundary Enforcement Strategy
+     72:**Scope:** Frontend
+     115:**Decision:** **A (@t3-oss/env-nextjs)**
+     120:## TD-03: API URL Key Strategy for the FE↔BE Bridge
+     122:**Scope:** Cross-layer
+     162:**Decision:** **A (Strict BFF — single server-only `API_URL`)**
+     === technical-decisions-next-frontend-msw-foundation.md
+     ---
+     scope_type: ad-hoc
+     related_phases: []
+     status: decided
+     date: 2026-05-13
+     scope_description: "MSW (Mock Service Worker) foundation for next-frontend: handler module organization across domains/phases, separation between Node test handlers (msw/node) and browser dev handlers (msw/browser Service Worker), response builder/factory strategy (with or without faker-js), and how each phase exposes its handler set to that phase's tests."
+     ---
+     
+     # Technical Decisions — next-frontend MSW Foundation
+     
+     _Subprojects in scope:_
+     
+     27:## TD-01: Handler Module Organization & Phase Expansion Model
+     29:**Scope:** Frontend
+     101:**Decision:** B (per-domain modules under `mocks/handlers/<domain>.ts` + barrel `mocks/handlers/index.ts`)
+     105:## TD-02: Node Test Handlers vs. Browser Dev Handlers (setupServer / setupWorker)
+     107:**Scope:** Frontend
+     173:**Decision:** A (test-only `setupServer` at foundation; browser worker deferred until a real FE-offline-dev consumer exists)
+     177:## TD-03: Response Builders / Factory Pattern (with or without faker-js)
+     179:**Scope:** Frontend
+     285:**Decision:** D (hand-written deterministic def … (+7404 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-02-auth.md)
+  ⎿  1	---
+     2	scope_type: phase
+     3	related_phases: [2]
+     4	status: decided
+     5	date: 2026-04-07
+     6	scope_description: "Backend foundation for account lifecycle: password hashing, JWT auth, refresh-token rotation, email-confirmation/reset tokens, transactional email, request validation, error contract, rate limiting, and nickname generation."
+     7	---
+     8	
+     9	# Technical Decisions — Phase 02: Cadastro, Login e Gerenciamento de Conta
+     10	
+     11	_Subprojects in scope:_
+     12	
+     13	- `nestjs-project/` — backend that delivers all account-lifecycle endpoints (register, confirm, login, refresh, logout, password reset) plus transactional email, request validation, error filter, throttling, and channel-handle generation.
+     14	- `next-frontend/` — Frontend deferred: registration, login, confirmation and password-recovery screens (`Telas de cadastro, login, confirmação de conta e recuperação de senha`) will be addressed in a future phase when `next-frontend/` is initialized. No open decision in this document.
+     15	
+     16	---
+     17	
+     18	## TD-01: Password Hashing Algorithm
+     19	
+     20	**Scope:** Backend
+     21	
+     22	**Capability:** Cadastro de usuário com e-mail e senha
+     23	
+     24	**Context:** User registration requires securely storing passwords. The choice of hashing algorithm impacts security against brute-force/GPU attacks and runtime performance.
+     25	
+     26	**Options:**
+     27	
+     28	### Option A: bcrypt
+     29	- Industry standard since 1999, adaptive cost factor. Uses `bcrypt` npm package (~800K weekly downloads). Fixed 4KB memory per hash.
+     30	- **Pros:** Battle-tested, mature ecosystem, widely understood, simple API (`bcrypt.hash(password, 10)`), excellent NestJS community examples.
+     31	- **Cons:** Fixed 4KB memory usage — vulnerable to GPU/ASIC attacks at scale. No memory-hardness tuning. Cost factor is the only knob.
+     32	
+     33	### Option B: Argon2id
+     34	- Winner of the 2015 Password Hashing Competition. Uses `argon2` npm package. Hybrid mode (data-dependent + data-independent) resists both GPU and side-channel attacks. Configurable memory ( … (+28608 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-next-frontend-config-base.md)
+  ⎿  118	---
+     119	
+     120	## TD-03: API URL Key Strategy for the FE↔BE Bridge
+     121	
+     122	**Scope:** Cross-layer
+     123	
+     124	**Trigger:** Define the canonical env-key contract that `next-frontend` uses to reach `nestjs-project`. This is the FIRST cross-component value defined by the env layer and must be settled at the foundation phase because it shapes the schema, the `.env.example`, and the eventual Docker network configuration.
+     125	
+     126	**Context:** Per `next-frontend/CLAUDE.md` ("Talking to the NestJS API" section), the two subprojects today run on **separate Docker Compose stacks** with no shared network:
+     127	
+     128	- Browser ⇒ NestJS API: `http://localhost:3000` (host-exposed port of `nestjs-api`).
+     129	- Server-side code (RSC / Route Handlers / Server Actions, **inside the `next-frontend` container**) ⇒ NestJS API: **does not yet work** — `localhost:3000` from inside the container resolves to the container itself, not the host. CLAUDE.md notes "a shared Compose network or `host.docker.internal` will be required — to be defined".
+     130	
+     131	The testing strategy in CLAUDE.md mandates a **BFF model**: every NestJS call originates from a Next.js Route Handler (`app/api/.../route.ts`), and Client Components call only same-origin Next.js routes. BFF tests stub `fetch` to NestJS via MSW. This testing architecture has implications for which keys are actually necessary.
+     132	
+     133	This is `Scope: Cross-layer` because: (a) the chosen key set must align with backend CORS configuration (server-side knows which origin to allow); (b) the key set will be consumed by both subprojects' compose files and by every future FE feature that talks to the backend; and (c) the question "browser direct-calls backend or only via BFF?" is the contract between the two layers.
+     134	
+     135	**Options:**
+     136	
+     137	### Option A: Strict BFF — single server-only `API_URL`
+     138	
+     139	One key, server-only: `API_URL`. Only Route Handlers / RSC / Server Actions read it. Client Components call **only** same-origin Next.js route … (+5292 chars)
+● ToolSearch({"query": "select:mcp__context7__resolve-library-id,mcp__context7__query-docs,WebSearch,WebFetch", "max_results": 4})
+  ⎿     
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube && sed -n 1,60p nestjs-project/src/channels/entities/channel.entity.ts; cat nestjs-project/Dockerfile.dev; cat nestjs-project/src/config/env.validation.ts; node -e "const l=require('./nestjs-project/package-lock.json');for(const k of ['@nestjs/core','@nestjs/common','typeorm','@nestjs/platform-express']){console.log(k,l.packages['node_modules/'+k]?.version)}"; grep -n '"type"' nestjs-project/package.json; ls next-frontend | head; ls docs/phases/phase-02-auth)
+  ⎿  import {
+       Column,
+       CreateDateColumn,
+       Entity,
+       JoinColumn,
+       OneToOne,
+       PrimaryGeneratedColumn,
+       UpdateDateColumn,
+     } from 'typeorm';
+     import { User } from '../../users/entities/user.entity';
+     
+     @Entity('channels')
+     export class Channel {
+       @PrimaryGeneratedColumn('uuid')
+       id: string;
+     
+       @Column({ type: 'varchar', length: 50 })
+       name: string;
+     
+       @Column({ type: 'varchar', length: 50, unique: true })
+       nickname: string;
+     
+       @Column({ type: 'text', nullable: true })
+       description: string | null;
+     
+       @Column({ type: 'uuid', unique: true })
+       user_id: string;
+     
+       @CreateDateColumn()
+       created_at: Date;
+     
+       @UpdateDateColumn()
+       updated_at: Date;
+     
+       @OneToOne(() => User, (user) => user.channel)
+       @JoinColumn({ name: 'user_id' })
+       user: User;
+     }
+     FROM node:25.6.0-slim
+     
+     RUN apt update && apt install -y procps curl
+     
+     WORKDIR /home/node/app
+     
+     USER node
+     
+     CMD [ "tail", "-f", "/dev/null" ] import * as Joi from 'joi';
+     
+     export const envValidationSchema = Joi.object({
+       NODE_ENV: Joi.string()
+         .valid('development', 'production', 'test')
+         .default('development'),
+       PORT: Joi.number().port().default(3000),
+       DB_HOST: Joi.string().default('localhost'),
+       DB_PORT: Joi.number().default(5432),
+       DB_USERNAME: Joi.string().required(),
+       DB_PASSWORD: Joi.string().required(),
+       DB_NAME: Joi.string().required(),
+       JWT_SECRET: Joi.string().required(),
+       JWT_REFRESH_SECRET: Joi.string().required(),
+       JWT_ACCESS_EXPIRATION: Joi.string().default('15m'),
+       JWT_REFRESH_EXPIRATION: Joi.string().default('7d'),
+       CONFIRMATION_TOKEN_EXPIRATION_HOURS: Joi.number().default(1),
+       PASSWORD_RESET_TOKEN_EXPIRATION_HOURS: Joi.number().default(1),
+       APP_URL: Joi.string().uri().default('http://localhost:3000'),
+       MAIL_HOST: Joi.string().default('mailpit'),
+       MAIL_PORT: Joi.number().default(1025),
+       MAIL_FROM: Joi.string().default('"StreamTube" <noreply@streamtube.com>'),
+       SWAGGER_ENABLED: Joi.string().valid('true', 'false').default('false'),
+     });
+     @nestjs/core 11.1.16
+     @nestjs/common 11.1.16
+     typeorm 0.3.28
+     @ne … (+205 chars)
+● mcp__context7__resolve-library-id({"libraryName": "BullMQ", "query": "NestJS BullMQ queue retries backoff job deduplication jobId"})
+● mcp__context7__resolve-library-id({"libraryName": "AWS SDK for JavaScript v3", "query": "S3 multipart upload presigned UploadPart URL getSignedUrl forcePathStyle endpoint"})
+  ⎿  Available Libraries:
+     
+     - Title: BullMQ
+     - Context7-compatible library ID: /taskforcesh/bullmq
+     - Description: BullMQ - Message Queue and Batch processing for NodeJS and Python based on Redis
+     - Code Snippets: 4244
+     - Source Reputation: High
+     - Benchmark Score: 86.1
+     - Versions: v6.3.11
+     ----------
+     - Title: BullMQ
+     - Context7-compatible library ID: /websites/bullmq_io
+     - Description: BullMQ is a fast and robust Node.js queue system built on Redis, designed for modern microservice architectures to handle distributed job execution with features like job scheduling, retries, and concurrency control.
+     - Code Snippets: 2654
+     - Source Reputation: High
+     - Benchmark Score: 90.77
+     ----------
+     - Title: NestJS Bull
+     - Context7-compatible library ID: /nestjs/bull
+     - Description: NestJS Bull provides modules for integrating Bull and BullMQ, popular queueing libraries, into NestJS applications for efficient background job processing.
+     - Code Snippets: 316
+     - Source Reputation: High
+     - Benchmark Score: 85.06
+     ----------
+     - Title: BullMQ
+     - Context7-compatible library ID: /websites/api_bullmq_io
+     - Description: BullMQ is a fast and reliable Redis-based distributed queue for Node.js with rock solid stability, atomicity, and support for job priorities, delays, parent-child dependencies, and rate limiting.
+     - Code Snippets: 1104
+     - Source Reputation: High
+     - Benchmark Score: 76.22
+     ----------
+     - Title: NestJS Bull (DeepWiki)
+     - Context7-compatible library ID: /websites/deepwiki_nestjs_bull
+     - Description: NestJS Bull provides modules for integrating NestJS applications with Redis-based Bull and BullMQ queue systems to handle background job processing and task scheduling.
+     - Code Snippets: 406
+     - Source Reputation: High
+     - Benchmark Score: 58
+● mcp__context7__resolve-library-id({"libraryName": "pg-boss", "query": "PostgreSQL job queue retry backoff singleton key"})
+  ⎿  Available Libraries:
+     
+     - Title: AWS SDK for JavaScript v3
+     - Context7-compatible library ID: /websites/aws_amazon_awsjavascriptsdk_v3
+     - Description: The AWS SDK for JavaScript v3 provides libraries, packages, and services to interact with Amazon Web Services (AWS) using JavaScript.
+     - Code Snippets: 74728
+     - Source Reputation: High
+     - Benchmark Score: 79.13
+     ----------
+     - Title: AWS SDK for JavaScript
+     - Context7-compatible library ID: /aws/aws-sdk-js-v3
+     - Description: The AWS SDK for JavaScript v3 is a modular and feature-rich SDK for interacting with Amazon Web Services, offering first-class TypeScript support and a new middleware stack.
+     - Code Snippets: 5598
+     - Source Reputation: High
+     - Benchmark Score: 78.36
+     ----------
+     - Title: AWS SDK for JavaScript v3
+     - Context7-compatible library ID: /websites/aws_amazon_sdk-for-javascript_v3_developer-guide
+     - Description: The AWS SDK for JavaScript v3 provides a JavaScript API for building applications and libraries for Node.js and browsers to interact with Amazon Web Services.
+     - Code Snippets: 5359
+     - Source Reputation: High
+     - Benchmark Score: 63.68
+     ----------
+     - Title: AWS SDK for JavaScript
+     - Context7-compatible library ID: /aws/aws-sdk-js
+     - Description: AWS SDK for JavaScript (v2) provides JavaScript developers with a robust library for interacting with Amazon Web Services APIs in their applications.
+     - Code Snippets: 144
+     - Source Reputation: High
+     - Benchmark Score: 48.92
+     ----------
+     - Title: AWS SDK for pandas
+     - Context7-compatible library ID: /aws/aws-sdk-pandas
+     - Description: AWS SDK for pandas enables easy integration with AWS services including Athena, Glue, Redshift, Timestream, OpenSearch, Neptune, DynamoDB, and S3 for data manipulation and analysis workflows.
+     - Code Snippets: 786
+     - Source Reputation: High
+     - Benchmark Score: 71.28
+● WebSearch({"query": "MinIO community edition Docker image discontinued maintenance mode 2025", "mode": "standard"})
+● WebSearch({"query": "fluent-ffmpeg repository archived deprecated", "mode": "standard"})
+  ⎿  Available Libraries:
+     
+     - Title: pg-boss (DeepWiki)
+     - Context7-compatible library ID: /websites/deepwiki_timgit_pg-boss
+     - Description: pg-boss is a PostgreSQL-based job queue system for Node.js designed for background processing and reliable asynchronous task execution.
+     - Code Snippets: 1173
+     - Source Reputation: High
+     - Benchmark Score: 83.61
+     ----------
+     - Title: pg-bossman
+     - Context7-compatible library ID: /ludicroushq/pg-bossman
+     - Description: A type-safe, lightweight wrapper around pg-boss, offering a flat jobs map, queue-level scheduling, a tiny send-only client, and a zero-build SSR dashboard.
+     - Code Snippets: 91
+     - Source Reputation: Medium
+     - Benchmark Score: 76.27
+  ⎿  Web search results for query: "fluent-ffmpeg repository archived deprecated"
+     
+     Links: [{"title":"This package has been deprecated","url":"https://npmjs.com/package/fluent-ffmpeg"},{"title":"Install fluent-ffmpeg as a git submodule","url":"https://docsearch.algolia.com/mcp/docs/repo/fluent-ffmpeg/node-fluent-ffmpeg"},{"title":"Toggle navigation","url":"https://www.jsdelivr.com/package/npm/fluent-ffmpeg?tab=files"},{"title":"fluent ffmpeg","url":"https://mcp.depscope.dev/pkg/npm/fluent-ffmpeg"},{"title":"Toggle navigation","url":"https://www.jsdelivr.com/package/npm/fluent-ffmpeg"},{"title":"projects.blender.org","url":"https://projects.blender.org/archive/blender-archive/src/branch/tmp-CollectionsAnim/intern/ffmpeg"},{"title":"projects.blender.org","url":"https://projects.blender.org/archive/blender-archive/src/commit/41c692ee2f0f5a92d6162e65652e6f8d399df1a9/source/blender"},{"title":"internal.replicate.com","url":"https://internal.replicate.com/awerks/ffmpeg/versions/4a658e4b52348c406b35e17cef094ce1de8cb6ba98043d850a698dd89aed9a63"},{"title":"internal.replicate.com","url":"https://internal.replicate.com/awerks/ffmpeg/versions/dc4e38f649eb0d07d8ff9290a597b0dacfa7e1b8febafde0f607b8a1e813db61"}]
+     
+     The results confirm that fluent-ffmpeg is deprecated, but they don't confirm that its GitHub repository is archived.
+     
+     - **npm:** The npm page shows a deprecation notice, and the package's own README says Fluent-ffmpeg is looking for new maintainers. The latest version is 2.1.3.
+     - **Repository note:** A repository listing for the GitHub project (github.com/fluent-ffmpeg/node-fluent-ffmpeg) states that this library is deprecated and no longer maintained.
+     - **Health check:** DepScope gives the package a 27/100 health score and flags it as deprecated, suggesting users find an alternative.
+     - **Archive status:** None of the results mention a GitHub archive flag. Checking the repository directly would settle that.
+     
+     The other results (Blender archives, Replicate models) are unrelated.
+      … (+102 chars)
+  ⎿  Web search results for query: "MinIO community edition Docker image discontinued maintenance mode 2025"
+     
+     Links: [{"title":"# MinIO Is Dead, Long Live MinIO","url":"https://blog.vonng.com/en/db/minio-resurrect/index.md"},{"title":"MinIO Ends Active Development, Steers Users Toward Paid AIStor","url":"https://linuxiac.com/minio-ends-active-development/"},{"title":"MinIO Ends Active Development, Steers Users Toward Paid AIStor","url":"https://linuxiac.com/?p=202894"},{"title":"MinIO in Maintenance Mode","url":"https://ayedo.de/en/posts/minio-im-maintenance-mode/"},{"title":"Secure and Free MinIO Chainguard Containers","url":"https://www.chainguard.dev/de-DE/unchained/secure-and-free-minio-chainguard-containers"},{"title":"MinIO in Maintenance Mode","url":"https://content.ayedo.de/en/posts/minio-im-maintenance-mode/"},{"title":"Deploy coolLabs MinIO","url":"https://railway.com/deploy/coollabs-minio"},{"title":"thanks for all the buckets","url":"https://madewithlove.com/blog/thanks-for-all-the-buckets/"},{"title":"eu.36kr.com","url":"https://eu.36kr.com/en/p/3521684347706501"},{"title":"MinIO CE in 2026: Retired Upstream, Source-Only, and What to Use","url":"https://glukhov.org/data-infrastructure/object-storage/minio-dead/"}]
+     
+     The search turned up consistent reporting that MinIO's free Community Edition stopped getting Docker images in October 2025 and then moved into maintenance mode.
+     
+     - **Docker images stopped (Oct 2025):** Sources say MinIO stopped publishing the free, community edition of their namesake Docker container image on October 23, 2025. Users now have to build containers from source. One report says the CVE fix released on October 15, 2025 was never uploaded to Docker Hub or Quay.io, and a maintainer confirmed the omission was intentional.
+     - **Maintenance mode:** Later reporting says the project has been placed into maintenance-only mode, ending all active development and feature work. Security fixes are reviewed only on a case-by-case basis. One blog date … (+1031 chars)
+● mcp__context7__query-docs({"libraryId": "/nestjs/bull", "query": "@nestjs/bullmq BullModule.forRoot connection registerQueue Processor WorkerHost NestJS 11", "language": "TypeScript"})
+● mcp__context7__query-docs({"libraryId": "/websites/bullmq_io", "query": "job attempts exponential backoff, stalled jobs, jobId deduplication, Redis maxmemory-policy noeviction requirement"})
+● mcp__context7__query-docs({"libraryId": "/aws/aws-sdk-js-v3", "query": "presign UploadPartCommand with getSignedUrl from s3-request-presigner, CreateMultipartUpload, CompleteMultipartUpload, ListParts, forcePathStyle custom endpoint", "language": "TypeScript"})
+  ⎿  ### Add job with exponential backoff
+     
+     Source: https://docs.bullmq.io/rust/introduction
+     
+     Adds a job with exponential backoff retry strategy. The backoff base is 1000 ms, doubling after each attempt (1s, 2s, 4s, 8s, 16s).
+     
+     ```rust
+     use bullmq::{Queue, QueueOptions, JobOptions};
+     use bullmq::types::BackoffStrategy;
+     
+     let queue = Queue::new("my-queue", QueueOptions::default()).await?;
+     
+     queue.add("flaky-job", serde_json::json!({}), Some(JobOptions {
+         attempts: Some(5),
+         backoff: Some(BackoffStrategy::Exponential(1000)), // 1s, 2s, 4s, 8s, 16s
+         ..Default::default()
+     })).await?;
+     ```
+     
+     --------------------------------
+     
+     ### moveStalledJobsToWait()
+     
+     Source: https://docs.bullmq.io/api/classes/v6.RedisQueueBackend.html
+     
+     Looks for unlocked jobs in the active queue. The job was being worked on, but the worker process died and it failed to renew the lock. We call these jobs 'stalled'. This is the most common case. We resolve these by moving them back to wait to be re-processed. To prevent jobs from cycling endlessly between active and wait, (e.g. if the job handler keeps crashing), we limit the number stalled job recoveries to settings.maxStalledCount.
+     
+     ```APIDOC
+     ## moveStalledJobsToWait()
+     
+     ### Description
+     Looks for unlocked jobs in the active queue. The job was being worked on, but the worker process died and it failed to renew the lock. We call these jobs 'stalled'. This is the most common case. We resolve these by moving them back to wait to be re-processed. To prevent jobs from cycling endlessly between active and wait, (e.g. if the job handler keeps crashing), we limit the number stalled job recoveries to settings.maxStalledCount.
+     
+     ### Method
+     moveStalledJobsToWait
+     
+     ### Signature
+     moveStalledJobsToWait(): Promise<string[]>
+     
+     ### Returns
+     - **Promise<string[]>** - The list of stalled job ids that were moved back to wait.
+     ```
+     
+     --------------------------------
+     
+     ### TypeScript example: throttle jobs with identical jobId
+     
+     Source: https://docs.bullmq.io/patterns/throttle-jobs
+     
+     Sets … (+2727 chars)
+  ⎿  ### forRoot usage example
+     
+     Source: https://github.com/nestjs/bull/blob/master/_autodocs/api-reference/bullmq-module.md
+     
+     Usage example for BullModule.forRoot. Configures a global BullMQ module with a Redis connection and sets extraOptions.manualRegistration to true, which prevents automatic registration of queues and workers. This is the standard way to set up shared configuration for the module.
+     
+     ```ts
+     import { Module } from '@nestjs/common';
+     import { BullModule } from '@nestjs/bullmq';
+     
+     @Module({
+       imports: [
+         BullModule.forRoot({
+           connection: { host: 'localhost', port: 6379 },
+           extraOptions: { manualRegistration: true }, // queues/workers are NOT auto-registered
+         }),
+       ],
+     })
+     export class AppModule {}
+     ```
+     
+     --------------------------------
+     
+     ### registerQueue usage example
+     
+     Source: https://github.com/nestjs/bull/blob/master/_autodocs/api-reference/bullmq-module.md
+     
+     Usage example for BullModule.registerQueue with an inline processor. Registers a queue named 'image-optimize' with default job options (attempts: 2) and a processor named 'resize' with concurrency 4. The processor callback processes each job by calling resizeImage on the job data.
+     
+     ```ts
+     import { Module } from '@nestjs/common';
+     import { BullModule } from '@nestjs/bullmq';
+     
+     @Module({
+       imports: [
+         BullModule.registerQueue({
+           name: 'image-optimize',
+           defaultJobOptions: { attempts: 2 },
+           processors: [
+             {
+               name: 'resize',
+               concurrency: 4,
+               callback: async (job) => {
+                 await resizeImage(job.data);
+               },
+             },
+           ],
+         }),
+       ],
+     })
+     export class ImageModule {}
+     ```
+     
+     --------------------------------
+     
+     ### Install BullMQ and NestJS BullMQ module
+     
+     Source: https://github.com/nestjs/bull/blob/master/packages/bullmq/README.md
+     
+     Use npm to install the @nestjs/bullmq and bullmq packages. This is the required setup for using BullMQ with NestJS.
+     
+     ```bash
+     $ npm i --save @nestjs/bullmq bullmq
+     ```
+     
+     --------------------------------
+     
+     ### P … (+2681 chars)
+● mcp__context7__query-docs({"libraryId": "/websites/deepwiki_timgit_pg-boss", "query": "retryLimit retryBackoff singletonKey work handler expireIn requirements PostgreSQL version"})
+  ⎿  ### Presign an existing HTTP request using S3RequestPresigner
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/packages/s3-request-presigner/README.md
+     
+     Instantiates S3RequestPresigner with custom region, credentials, and sha256 providers to sign an existing request object.
+     
+     ```javascript
+     import { S3RequestPresigner } from "@aws-sdk/s3-request-presigner";
+     import { Sha256 } from "@aws-sdk/checksums/sha";
+     
+     const signer = new S3RequestPresigner({
+       region: regionProvider,
+       credentials: credentialsProvider,
+       sha256: Sha256,
+     });
+     const presigned = await signer.presign(request);
+     ```
+     
+     --------------------------------
+     
+     ### Generate presigned URL using S3Client and GetObjectCommand
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/packages/s3-request-presigner/README.md
+     
+     Generates a presigned URL for an S3 operation using a client and command. The expiresIn configuration defaults to 900 seconds if not explicitly provided.
+     
+     ```javascript
+     import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+     import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+     const client = new S3Client(clientParams);
+     const command = new GetObjectCommand(getObjectParams);
+     const url = await getSignedUrl(client, command, { expiresIn: 3600 });
+     ```
+     
+     --------------------------------
+     
+     ### Set custom endpoint URL string on client initialization
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/supplemental-docs/CLIENTS.md
+     
+     Overrides the default rule-based endpoint resolution by supplying a static URL string to the client constructor.
+     
+     ```typescript
+     // Example: setting a custom endpoint.
+     new S3Client({
+       endpoint: "http://localhost:8888",
+     });
+     ```
+     
+     --------------------------------
+     
+     ### UploadPartCommand: sending each part and collecting its ETag
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/lib/lib-storage/src/Upload.ts
+     
+     Inside the concurrent uploader loop, each bounded part is sent via UploadPartCommand with the shared UploadId and its PartNumber. If the response is mi … (+1916 chars)
+  ⎿  ### Update queue configuration with updateQueue()
+     
+     Source: https://deepwiki.com/timgit/pg-boss/7.1-creating-and-configuring-queues
+     
+     Updates an existing queue's configuration, overwriting the existing settings in the database. The example sets retryLimit to 10 and enables retryBackoff.
+     
+     ```javascript
+     await boss.updateQueue('order-processing', { 
+       retryLimit: 10,
+       retryBackoff: true 
+     })
+     ```
+     
+     --------------------------------
+     
+     ### Add retry options to boss.send()
+     
+     Source: https://deepwiki.com/timgit/pg-boss/11.1-retry-configuration
+     
+     Configures a job with retry options: retryLimit of 3, retryDelay of 60 seconds, and exponential backoff enabled.
+     
+     ```javascript
+     // Basic job with retry
+     await boss.send('email-queue', emailData, {
+       retryLimit: 3,
+       retryDelay: 60, // retry after 60 seconds
+       retryBackoff: true // use exponential backoff
+     });
+     ```
+     
+     --------------------------------
+     
+     ### update()
+     
+     Source: https://deepwiki.com/timgit/pg-boss/15.2-job-operations-api
+     
+     Modifies an existing job that is not yet active. Requires either an id or a singletonKey.
+     
+     ```APIDOC
+     ## update()
+     
+     ### Description
+     Modifies an existing job that is not yet active. It requires either an `id` or a `singletonKey`.
+     
+     ### Method
+     update
+     
+     ### Signature
+     ```
+     update(name: string, data: object, options: UpdateOptions): Promise<UpdateResponse>
+     ```
+     
+     ### Parameters
+     - **name** (string) - Required - The queue name.
+     - **data** (object) - Required - The updated job data.
+     - **options** (UpdateOptions) - Required - Options including `id` or `singletonKey` and optional `match` strategy.
+     
+     ### Key Behaviors
+     - **Matching**: When using `singletonKey`, you can specify a `match` strategy: `newest` (default), `oldest`, or `all`.
+     - **State Guard**: Updates are no-ops if the job is already in the `active` state.
+     
+     ### Returns
+     - **Promise<UpdateResponse>** - The result of the update operation.
+     
+     ```
+     
+     ### Retry Configuration > Configuration Options
+     
+     Source: https://deepwiki.com/timgit/pg-boss/11.1-retry-configuration
+     
+     pg-boss provides  … (+701 chars)
+● WebFetch({"url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html", "prompt": "List the multipart upload limits: max object size, max parts, part size min/max, and max single PUT size."})
+  ⎿  
+     
+     # Amazon S3 multipart upload limits
+     <a name="qfacts"></a>
+     
+     Multipart upload allows you to upload a single object as a set of parts. Each part is a contiguous portion of the object's data. After all parts of your object are uploaded, Amazon S3 assembles these parts and creates the object. In general, when your object size reaches 100 MB, you should consider using multipart uploads instead of uploading the object in a single operation. For more information about multipart uploads, see [Uploading and copying objects using multipart upload in Amazon S3](mpuoverview.md). 
+     
+     The following table provides multipart upload core specifications. These include maximum object size, maximum number of parts, maximum part size, and more. There is no minimum size limit on the last part of your multipart upload.
+     
+     
+     | Item | Specification | 
+     | --- | --- | 
+     | Maximum object size | 48.8 TiB  | 
+     | Maximum number of parts per upload | 10,000 | 
+     | Part numbers | 1 to 10,000 (inclusive) | 
+     | Part size | 5 MiB to 5 GiB. There is no minimum size limit on the last part of your multipart upload. | 
+     | Maximum number of parts returned for a list parts request | 1000  | 
+     | Maximum number of multipart uploads returned in a list multipart uploads request | 1000  | 
+● WebFetch({"url": "https://github.com/minio/minio", "prompt": "What does the README say about project status (maintenance mode, archived), binary/docker image distribution and alternatives?"})
+● mcp__context7__resolve-library-id({"libraryName": "tus-node-server", "query": "@tus/server with @tus/s3-store resumable upload to S3 multipart"})
+● WebSearch({"query": "MinIO stale multipart uploads cleanup \"stale_uploads_expiry\" AbortIncompleteMultipartUpload lifecycle", "mode": "standard"})
+  ⎿  Available Libraries:
+     
+     - Title: tus Node Server
+     - Context7-compatible library ID: /tus/tus-node-server
+     - Description: Node.js tus server, standalone or integrable in any framework, with disk, S3, Azure, and GGC stores.
+     - Code Snippets: 462
+     - Source Reputation: High
+     - Benchmark Score: 87.54
+     ----------
+     - Title: tus-js-client
+     - Context7-compatible library ID: /tus/tus-js-client
+     - Description: A pure JavaScript client for the tus resumable upload protocol that enables resumable file uploads in browsers, Node.js, React Native, and Apache Cordova applications.
+     - Code Snippets: 162
+     - Source Reputation: High
+     - Benchmark Score: 87.88
+     ----------
+     - Title: tus
+     - Context7-compatible library ID: /websites/tus_io
+     - Description: tus is an open, HTTP-based protocol for reliable and resumable file uploads, offering simple, extensible, and production-ready solutions for clients and servers across any language or platform.
+     - Code Snippets: 265
+     - Source Reputation: High
+     - Benchmark Score: 83.05
+  ⎿  Web search results for query: "MinIO stale multipart uploads cleanup "stale_uploads_expiry" AbortIncompleteMultipartUpload lifecycle"
+     
+     Links: [{"title":"#  How to Implement MinIO Lifecycle Rules","url":"https://oneuptime.com/blog/post/2026-01-28-minio-lifecycle-rules/markdown"},{"title":"oneuptime.com","url":"https://oneuptime.com/blog/post/2026-01-28-minio-lifecycle-rules/view"},{"title":"Cleaning up after failed jobs","url":"https://docs.cloudera.com/cdp-private-cloud-base/7.1.7/cloud-data-access/topics/cr-cda-cleaning-up-after-failed-jobs.html"},{"title":"The S3A committers upload data in the tasks, completing the uploads when the job is","url":"https://docs.cloudera.com/runtime/7.2.17/cloud-data-access/topics/cr-cda-cleaning-up-after-failed-jobs.html"},{"title":"Cleaning up after failed jobs","url":"https://docs.cloudera.com/runtime/7.2.18/cloud-data-access/topics/cr-cda-cleaning-up-after-failed-jobs.html"},{"title":"github.com","url":"https://github.com/tus/tus-node-server/pull/513"},{"title":"Cleaning up after failed jobs","url":"https://docs.cloudera.com/cdp-private-cloud-base/7.1.9/cloud-data-access/topics/cr-cda-cleaning-up-after-failed-jobs.html"},{"title":"abort multipart upload minio","url":"https://www.scaleway.com/en/docs/tutorials/abort-multipart-upload-minio/"},{"title":"Cleaning up after failed jobs","url":"https://docs.cloudera.com/runtime/7.3.2/cloud-data-access/topics/cr-cda-cleaning-up-after-failed-jobs.html"},{"title":"Cleaning up after failed jobs","url":"https://docs.cloudera.com/runtime/7.2.15/cloud-data-access/topics/cr-cda-cleaning-up-after-failed-jobs.html"}]
+     
+     Links: [{"title":"LifecycleRule class","url":"https://pub.dev/documentation/minio/latest/models/LifecycleRule-class.html"},{"title":"Rule class","url":"https://pub-web-s2.flutter-io.cn/documentation/minio/3.5.7/models/Rule-class.html"},{"title":"Rule class","url":"https://pub.dev/documentation/minio/latest/models/Rule-class.html"},{"title":"Applying lifecycle policies","url":"https: … (+2285 chars)
+  ⎿  **Project status:** The README opens with the notice "THIS REPOSITORY IS NO LONGER MAINTAINED." The page also says the owner archived the repository, so it is now read-only.
+     
+     **Binary distribution:** The community edition is distributed as source code only, and the README says no new precompiled binaries will be released. Older binaries remain on GitHub Releases and dl.min.io, but they are no longer maintained. The README recommends building from source with `go install github.com/minio/minio@latest` (Go 1.24 or later).
+     
+     **Docker:** The README describes building a local image from the provided Dockerfile, after first building the `minio` binary. It doesn't mention prebuilt images, though a Docker Hub badge still appears.
+     
+     **Alternatives:**
+     - **AIStor Free:** A full-featured standalone edition with a free license for community use.
+     - **AIStor Enterprise:** A distributed edition with commercial support.
+● WebFetch({"url": "https://madewithlove.com/blog/thanks-for-all-the-buckets/", "prompt": "What are the options for running MinIO in Docker now (quay.io tag, Chainguard, pgsty fork, other S3-compatible alternatives)? Give exact image names/tags mentioned."})
+● mcp__context7__query-docs({"libraryId": "/tus/tus-node-server", "query": "@tus/s3-store S3Store configuration partSize endpoint, running tus server standalone vs inside NestJS/Express, onUploadFinish hook", "language": "TypeScript"})
+● WebSearch({"query": "pgsty minio fork docker image pgsty/minio", "mode": "standard"})
+  ⎿  ### Basic S3Store setup
+     
+     Source: https://github.com/tus/tus-node-server/blob/main/_autodocs/api-reference/s3-store.md
+     
+     Basic usage of S3Store with the tus Server, configuring part size and S3 client credentials.
+     
+     ```ts
+     import {Server} from '@tus/server'
+     import {S3Store} from '@tus/s3-store'
+     
+     const s3Store = new S3Store({
+       partSize: 8 * 1024 * 1024,
+       s3ClientConfig: {
+         bucket: process.env.AWS_BUCKET,
+         region: process.env.AWS_REGION,
+         credentials: {
+           accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+         },
+       },
+     })
+     const server = new Server({path: '/files', datastore: s3Store})
+     ```
+     
+     --------------------------------
+     
+     ### Options Type
+     
+     Source: https://github.com/tus/tus-node-server/blob/main/_autodocs/api-reference/s3-store.md
+     
+     Type definition for the Options object used to configure the S3Store.
+     
+     ```ts
+     export type Options = {
+       partSize?: number
+       minPartSize?: number
+       maxMultipartParts?: number
+       useTags?: boolean
+       maxConcurrentPartUploads?: number
+       cache?: KvStore<MetadataValue>
+       expirationPeriodInMilliseconds?: number
+       s3ClientConfig: S3ClientConfig & {bucket: string}
+     }
+     ```
+     
+     --------------------------------
+     
+     ### ServerOptions Type
+     
+     Source: https://github.com/tus/tus-node-server/blob/main/_autodocs/types.md
+     
+     The ServerOptions type definition from the source file, showing all configuration options for the tus server.
+     
+     ```ts
+     export type ServerOptions = {
+       path: string
+       maxSize?: number | ((req: Request, uploadId: string | null) => Promise<number> | number)
+       relativeLocation?: boolean
+       respectForwardedHeaders?: boolean
+       allowedHeaders?: string[]
+       exposedHeaders?: string[]
+       generateUrl?: (
+         req: Request,
+         options: {proto: string; host: string; path: string; id: string}
+       ) => string
+       getFileIdFromRequest?: (req: Request, lastPath?: string) => string | undefined
+       namingFunction?: (
+         req: Request,
+         metadata?: Upload['metadata']
+       ) => string | Promise<string>
+       locker?: Locker | Pr … (+2051 chars)
+  ⎿  Web search results for query: "pgsty minio fork docker image pgsty/minio"
+     
+     Links: [{"title":"hub.docker.com","url":"https://hub.docker.com/r/pgsty/minio"},{"title":"hub.docker.com","url":"https://hub.docker.com/r/pgsty/mc"},{"title":"github.com","url":"https://github.com/arrrrny/minio"},{"title":"Open-Source Community Launches MinIO Fork","url":"https://linuxiac.com/open-source-community-launches-minio-fork/"},{"title":"docs.dokploy.com","url":"https://docs.dokploy.com/docs/templates/minio"},{"title":"Cómo arreglar pull access denied for minio/minio en Docker","url":"https://jacar.es/?p=7602"},{"title":"How to fix pull access denied for minio/minio in Docker","url":"https://jacar.es/?p=7603"},{"title":"minio is not working","url":"https://station.railway.com/questions/minio-is-not-working-b61cc91c"},{"title":"pigsty.io","url":"https://pigsty.io/docs/minio/faq/"}]
+     
+     The `pgsty/minio` image is a community-maintained fork of MinIO, run by Pigsty. The Docker Hub page says it is NOT affiliated with, endorsed by, or sponsored by MinIO, Inc. Its changes are small: it restores the embedded console's version reference and updates documentation links and Go module paths. Changes from upstream are minimal, and the project is distributed under the original AGPLv3 license.
+     
+     Several sources say the upstream image was withdrawn. One Dokploy template uses the fork because MinIO Inc. stopped publishing Docker images in October 2025 and archived the upstream project in February 2026 (MinIO Inc. stopped publishing Docker images in October 2025 and archived the upstream open source project in February 2026.). That template describes the fork as a drop-in replacement that keeps the same environment variables and data format. Its example tag is `pgsty/minio:RELEASE.2026-06-18T00-00-00Z`.
+     
+     Some newer sources point to `pgsty/silo` as the name for the same fork. The Railway thread says the drop-in solution is swapping to Silo (a MinIO fork): https://hub.docker.com/r/pgsty/silo. The Docker Hu … (+399 chars)
+  ⎿  The article names these options for running MinIO-compatible storage in Docker:
+     
+     - **`quay.io/minio/minio`**: A mirror of MinIO's images. Its "`latest` tag remains on the September 2025 community release." Occasional undocumented hotfix tags appear on top of old releases, with no support commitment.
+     - **`pgsty/silo`**: A community fork of MinIO, found at github.com/pgsty/silo. The article doesn't give a Docker image name or tag for it.
+     - **`rustfs/rustfs:latest`**: The article's recommended replacement for MinIO in Laravel projects. It is S3-compatible and was still on 1.0.0 release candidates when the article was written.
+     - **AIStor Free**: MinIO's current README recommendation. It is proprietary, and the article says "every deployment needs a licence file that you must request from them." No image name is given.
+     
+     The article doesn't mention Chainguard. It also says other open-source alternatives exist but doesn't name any besides RustFS.
+● I have what I need. Writing the decisions document now.
+● Write(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-upload-processing.md (41930 chars))
+  ⎿  File created successfully at: /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-upload-processing.md (file state is current in your context — no need to Read it back)
+● I wrote the Phase 03 decisions document at `docs/decisions/technical-decisions-phase-03-upload-processing.md`. It has 15 decisions, each with options, trade-offs and a recommendation, and every Decision field is left as `_[pending]_`. All of it targets `nestjs-project/`; the frontend has no open decision here.
+
+**Something you should know before deciding:** the brief assumes MinIO runs locally in Docker, but MinIO stopped publishing free Docker images in October 2025. Its GitHub repository is now archived and marked "no longer maintained". I didn't reopen the storage choice; TD-04 only decides where the local image comes from. I recommend pinning the last official image from the Quay mirror (`quay.io/minio/minio`), with the maintained community copy (`pgsty/minio`) as a one-line fallback.
+
+**Main recommendations:**
+- **Queue (TD-01):** BullMQ with Redis, which has an official NestJS module and recovers jobs if a worker dies mid-run. `pg-boss`, which stores the queue in PostgreSQL and adds no new service, is a close second.
+- **10GB upload (TD-07, TD-08):** the browser uploads the file in parts straight to storage using short-lived signed URLs. It resumes by re-sending only the missing parts, and the API calls never carry the video bytes. A single signed upload isn't an option because S3 caps one upload request at 5 GiB. The API then confirms the upload is complete and queues the processing job.
+- **Signed URLs in Docker (TD-05):** a URL signed for `minio:9000` won't resolve in the browser. The fix is two settings: `S3_ENDPOINT` (the service name) for server-side calls, and `S3_PUBLIC_ENDPOINT` (`localhost:9000`) used only when signing browser URLs.
+- **Worker (TD-02, TD-11, TD-12):**
+  - It runs from the same codebase as the API but as its own Compose service, with FFmpeg installed only in that image.
+  - It calls `ffprobe`/`ffmpeg` directly; `fluent-ffmpeg` is deprecated.
+  - It reads only the parts of the file it needs over a signed URL instead of downloading up to 10GB.
+- **Formats (TD-09):** accept only formats browsers can play, checked when the upload starts and again by the worker. This phase only extracts metadata and doesn't convert videos, so other formats would be stored but wouldn't play.
+- **Status (TD-10, TD-13):**
+  - Track processing (`uploading` → `processing` → `ready`/`failed`) separately from publication (`draft`, which Phase 04 extends).
+  - Retry temporary errors with backoff; mark permanent errors as failed straight away.
+  - A scheduled cleanup job requeues stuck videos and clears uploads that were never finished.
+- **URL and delivery (TD-14, TD-15):**
+  - Each video gets a random 11-character ID with a unique constraint in the database, so unlisted videos can't be guessed.
+  - Playback and download use short-lived signed links straight from storage, which handles partial requests (206) itself. Downloads add an "attachment" setting to the same kind of link.
+
+I didn't commit the document. Next step: `/plan-context 03`, then `/plan-validate`, then `/plan-resolve` to record your choices.
+
+Sources:
+- [MinIO GitHub README (archived, "no longer maintained")](https://github.com/minio/minio)
+- [madewithlove — "thanks for all the buckets"](https://madewithlove.com/blog/thanks-for-all-the-buckets/)
+- [linuxiac — MinIO ends active development](https://linuxiac.com/minio-ends-active-development/)
+- [pgsty/minio on Docker Hub](https://hub.docker.com/r/pgsty/minio)
+- [Amazon S3 multipart upload limits](https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html)
+- [fluent-ffmpeg on npm (deprecated)](https://npmjs.com/package/fluent-ffmpeg)
+- [oneuptime — MinIO lifecycle rules](https://oneuptime.com/blog/post/2026-01-28-minio-lifecycle-rules/markdown)
+- Library docs looked up through context7: `@nestjs/bullmq`, BullMQ, AWS SDK v3, pg-boss, tus-node-server.
+
+=== result: success turns=26 cost=$1.9429596999999998 duration=385s
