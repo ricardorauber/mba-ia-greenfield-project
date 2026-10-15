@@ -17,6 +17,23 @@ services:
       minio-init:
         condition: service_completed_successfully
 
+  # Same image and code as the API, separate entrypoint without HTTP (TD-02)
+  video-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: npm run start:worker:dev
+    restart: unless-stopped
+    volumes:
+      - .:/home/node/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
   db:
     image: postgres:17
     ports:

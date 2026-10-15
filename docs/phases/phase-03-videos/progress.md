@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 15/20 completed
+**SIs:** 16/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -153,9 +153,19 @@
   - The integration and e2e tests store a 4-byte JPEG (SOI+EOI markers) as the thumbnail, since storage only needs the object and its `Content-Type`.
 
 ### SI-03.16 — Runtime do worker: consumer BullMQ, entrypoint separado e serviço Compose `video-worker`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 20 passing (`video-processing.consumer.spec.ts` 15, `video-processing.consumer.integration-spec.ts` 2 through the real `WorkerModule` with Redis + Postgres + MinIO + FFmpeg, `worker.module.integration-spec.ts` 3); full suites green afterwards: 388 unit/integration (47 suites), 88 e2e (9 suites); `npm run build` emits `dist/worker.js`; `npm run lint` clean. Dev-stack end-to-end check passed (below).
+- **Observations:**
+  - **Channel → User fix (maestro request):** `WorkerModule` imports `UsersModule` (the module that owns `User`), mirroring how `AppModule` gets it through `AuthModule`. `ChannelsModule` can't import `UsersModule` (circular: `UsersModule` imports `ChannelsModule`). The consumer integration test compiles the real `WorkerModule` with no `TypeOrmModule.forFeature([User])` patch. The earlier integration specs of `VideosModule` / `VideoProcessingModule` (SI-03.8/10/11/12/13/15) still register `User` in the test module, because they compile those modules standalone; aligning them is a separate task if wanted.
+  - `VideoProcessingWorkerModule` also imports `VideosModule` (the consumer injects `VideosService` for `markFailed`; `VideoProcessingModule` does not re-export it).
+  - The failed-event decision is a pure exported function, `finalFailureReason(job, error)`. `UnrecoverableError` → its message if it is `unsupported_format`/`invalid_media`, otherwise `processing_error`; `attemptsMade >= opts.attempts` → `processing_error`; "stalled more than allowable limit" → `processing_error`; otherwise `null` (retry pending, logged as a warning). `onFailed` catches and logs `markFailed` errors (event-handler context, per the service-error rules); a video left in `processing` is re-enqueued by the sweep.
+  - **Graceful shutdown fix:** with `command: npm run start:worker:dev`, `docker compose stop` sent SIGTERM to `npm` (PID 1). `npm` forwarded it to `sh -c`, which (dash) died without passing it on, and the kernel then SIGKILLed `node --watch` and the worker: no Nest hooks, connections dropped abruptly, exit 1 with `npm error … signal SIGTERM`. The script is now `exec node --watch …`, so `sh` is replaced and the chain is `npm → node --watch → worker`; `node --watch` forwards SIGTERM (`--watch-kill-signal=SIGTERM`) and waits. Verified: `Video worker shut down (SIGTERM)` is logged (new `WorkerModule.onApplicationShutdown` log line), exit code 0, no `npm error`, and the worker's 3 Redis connections close. The Compose `command` stays as planned.
+  - **Dev-stack end-to-end (maestro request):** `docker compose up -d` brings up `video-worker` with no published ports; logs show `Video worker ready, consuming video-processing`. The API dev server was started only for this check and stopped afterwards (port 3000 not listening again). A host-side client (stdlib Python, in the session scratchpad, not committed) did register → Mailpit confirmation → login → `POST /videos` → part URL → `PUT` straight to `localhost:9000` → `complete`:
+    - a 12 s 1280x720 H.264/AAC MP4 → `ready` in ~1 s with duration 12, 1280x720, size 273253, metadata and thumbnail; `GET /stream` → 302 (`Cache-Control: private, no-store`, Location on `localhost:9000`) → Range GET `206`, `bytes 0-1023/273253`; thumbnail `image/jpeg` (`ffd8`);
+    - an MPEG-4 Part 2 MP4 → `failed` / `unsupported_format`, no thumbnail;
+    - with `video-worker` stopped, a completed upload stayed `processing` with its job waiting (`streamtube:video-processing:wait` = 1, so the API does not consume); after `docker compose start video-worker` it went `ready` (wait list back to 0).
+  - AC "transient error retried with exponential backoff, `processing_error` after 5 attempts" is covered by the unit matrix (`finalFailureReason`/`onFailed`) plus BullMQ's own `attempts`/`backoff` options from SI-03.5. It wasn't exercised against real storage outages, since the real schedule is 5 s+10 s+20 s+40 s.
+  - Test isolation: both worker integration specs use a unique `QUEUE_PREFIX` per file, so the running dev `video-worker` (prefix `streamtube`) never sees test jobs and vice versa; 0 leftover keys.
 
 ### SI-03.17 — Sweep de reconciliação: job scheduler `reconcile-videos`
 - **Status:** pending
