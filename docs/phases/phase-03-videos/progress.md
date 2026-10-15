@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 1/20 completed
+**SIs:** 2/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -14,9 +14,12 @@
   - `npm install` reports 51 audit vulnerabilities (2 low, 17 moderate, 29 high, 3 critical). This SI did not check how many of them predate it; running `npm audit` triage is a separate task.
 
 ### SI-03.2 — Namespaces de configuração `storage` e `queue` e ambiente de teste isolado
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 24 passing (`env.validation.integration-spec.ts` + `storage.config.spec.ts`); existing e2e suite still green (52)
+- **Observations:**
+  - **Plan path fix:** the plan gave `<rootDir>/src/test/setup-test-env.ts` for `test/jest-e2e.json`, but that config's `rootDir: "."` resolves relative to the config file (`test/`), so Jest failed with "Module ... in the setupFiles option was not found". Used `<rootDir>/../src/test/setup-test-env.ts`. Confirmed with a throwaway e2e probe (deleted afterwards) that `QUEUE_PREFIX=streamtube-test` and `S3_PUBLIC_ENDPOINT=http://minio:9000` hold under the e2e config.
+  - Added a `Jest test environment isolation` case to `env.validation.integration-spec.ts` so the AC "inside Jest, QUEUE_PREFIX/S3_PUBLIC_ENDPOINT are overridden" is observable in the unit/integration run.
+  - Extra validation cases beyond the plan's list: TTL above the 7-day SigV4 cap, non-URI `S3_ENDPOINT`, out-of-range `REDIS_PORT`.
 
 ### SI-03.3 — DatabaseModule e opções de ConfigModule compartilhadas entre API e worker
 - **Status:** pending
