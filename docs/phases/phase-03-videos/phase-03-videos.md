@@ -1036,32 +1036,32 @@ Ordem linearizada sugerida: SI-03.1 → SI-03.2 → SI-03.3, SI-03.4, SI-03.5, S
 
 ## Deliverables
 
-- [ ] SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
-- [ ] SI-03.2 — Namespaces de configuração `storage` e `queue` e ambiente de teste isolado
-- [ ] SI-03.3 — DatabaseModule e opções de ConfigModule compartilhadas entre API e worker
-- [ ] SI-03.4 — StorageModule: clientes S3 interno/público, multipart e URLs pré-assinadas
-- [ ] SI-03.5 — QueueModule e fila `video-processing` (contratos + producer)
-- [ ] SI-03.6 — Entidade `Video` e migration `CreateVideos`
-- [ ] SI-03.7 — VideosService: pré-cadastro com slug único, leitura do dono e transições condicionais
-- [ ] SI-03.8 — Endpoint POST /videos (início do upload + pré-cadastro do rascunho)
-- [ ] SI-03.9 — Endpoint GET /videos/:id (leitura do dono)
-- [ ] SI-03.10 — Endpoint GET /videos/:id/upload (estado para retomada)
-- [ ] SI-03.11 — Endpoint POST /videos/:id/upload/part-urls (URLs pré-assinadas de partes)
-- [ ] SI-03.12 — Endpoint POST /videos/:id/upload/complete (conclusão + disparo do processamento)
-- [ ] SI-03.13 — Endpoints de entrega: streaming, download e thumbnail
-- [ ] SI-03.14 — MediaToolsService: wrapper tipado de ffprobe/ffmpeg
-- [ ] SI-03.15 — VideoProcessingService: extração de metadados e geração de thumbnail
-- [ ] SI-03.16 — Runtime do worker: consumer BullMQ, entrypoint separado e serviço Compose `video-worker`
-- [ ] SI-03.17 — Sweep de reconciliação: job scheduler `reconcile-videos`
-- [ ] SI-03.18 — E2E do pipeline completo: upload → processamento → streaming/download
-- [ ] SI-03.19 — OpenAPI: completar schemas de vídeos e regenerar `openapi.json`
-- [ ] SI-03.20 — Documentação: seção de vídeos nos CLAUDE.md e estratégia de testes de storage/fila
+- [x] SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
+- [x] SI-03.2 — Namespaces de configuração `storage` e `queue` e ambiente de teste isolado
+- [x] SI-03.3 — DatabaseModule e opções de ConfigModule compartilhadas entre API e worker
+- [x] SI-03.4 — StorageModule: clientes S3 interno/público, multipart e URLs pré-assinadas
+- [x] SI-03.5 — QueueModule e fila `video-processing` (contratos + producer)
+- [x] SI-03.6 — Entidade `Video` e migration `CreateVideos`
+- [x] SI-03.7 — VideosService: pré-cadastro com slug único, leitura do dono e transições condicionais
+- [x] SI-03.8 — Endpoint POST /videos (início do upload + pré-cadastro do rascunho)
+- [x] SI-03.9 — Endpoint GET /videos/:id (leitura do dono)
+- [x] SI-03.10 — Endpoint GET /videos/:id/upload (estado para retomada)
+- [x] SI-03.11 — Endpoint POST /videos/:id/upload/part-urls (URLs pré-assinadas de partes)
+- [x] SI-03.12 — Endpoint POST /videos/:id/upload/complete (conclusão + disparo do processamento)
+- [x] SI-03.13 — Endpoints de entrega: streaming, download e thumbnail
+- [x] SI-03.14 — MediaToolsService: wrapper tipado de ffprobe/ffmpeg
+- [x] SI-03.15 — VideoProcessingService: extração de metadados e geração de thumbnail
+- [x] SI-03.16 — Runtime do worker: consumer BullMQ, entrypoint separado e serviço Compose `video-worker`
+- [x] SI-03.17 — Sweep de reconciliação: job scheduler `reconcile-videos`
+- [x] SI-03.18 — E2E do pipeline completo: upload → processamento → streaming/download
+- [x] SI-03.19 — OpenAPI: completar schemas de vídeos e regenerar `openapi.json`
+- [x] SI-03.20 — Documentação: seção de vídeos nos CLAUDE.md e estratégia de testes de storage/fila
 
 **Full test suites:**
 
-- [ ] `docker compose up -d` sobe `db`, `mailpit`, `minio`, `minio-init` (exit 0), `redis`, `nestjs-api` e `video-worker` juntos
-- [ ] Backend tests pass — unit + integration (`docker compose exec nestjs-api npm test -- --runInBand`)
-- [ ] E2E tests pass (`docker compose exec nestjs-api npm run test:e2e`)
-- [ ] Type/compilation checks pass (`docker compose exec nestjs-api npx tsc --noEmit`)
-- [ ] Lint passes (`docker compose exec nestjs-api npm run lint`)
-- [ ] Project builds successfully, including `dist/worker.js` (`docker compose exec nestjs-api npm run build`)
+- [x] `docker compose up -d` sobe `db`, `mailpit`, `minio`, `minio-init` (exit 0), `redis`, `nestjs-api` e `video-worker` juntos
+- [x] Backend tests pass — unit + integration (`docker compose exec nestjs-api npm test -- --runInBand`)
+- [x] E2E tests pass (`docker compose exec nestjs-api npm run test:e2e`)
+- [x] Type/compilation checks pass (`docker compose exec nestjs-api npx tsc --noEmit`)
+- [x] Lint passes (`docker compose exec nestjs-api npm run lint`)
+- [x] Project builds successfully, including `dist/worker.js` (`docker compose exec nestjs-api npm run build`)

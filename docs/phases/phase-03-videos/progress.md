@@ -1,7 +1,26 @@
 # phase-03-videos — Progress
 
-**Status:** in_progress
+**Status:** completed
 **SIs:** 20/20 completed
+
+## Final verification (2026-10-15)
+
+All commands ran inside the `nestjs-api` container, with the whole stack up and the dev `video-worker` running throughout.
+
+| Check | Result |
+|---|---|
+| `docker compose up -d` | `db`, `mailpit`, `minio`, `redis` healthy; `minio-init` `Exited (0)`; `nestjs-api` and `video-worker` up (worker logged `Video worker ready, consuming video-processing`) |
+| `npm test -- --runInBand` (run 1) | 423 passed / 50 suites, exit 0 (93 s) |
+| `npm test -- --runInBand` (run 2, back to back) | 423 passed / 50 suites, exit 0 (85 s) |
+| `npm run test:e2e` | 93 passed / 10 suites, exit 0 (93 s) |
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint "{src,apps,libs,test}/**/*.ts"` (no `--fix`) | exit 0 |
+| `npm run lint` | exit 0; working tree unchanged afterwards (no `--fix` diff) |
+| `npm run build` | exit 0; `dist/main.js`, `dist/worker.js` emitted |
+
+**Flakiness check (SI-03.3 `auth.service.integration-spec.ts` `beforeAll` timeout):** not reproduced in the 2 full runs nor in 3 extra isolated runs of the suite. Its timing does swing widely between identical runs: total 6.2 s / 17.6 s / 16.7 s; hook-and-setup overhead 2.4 s / 11.2 s / 2.7 s; test time 3.8 s / 6.4 s / 14.0 s. The container was idle, so this is host-side CPU contention (other projects' containers share the Docker VM, and the suite does argon2 hashing), not a leak in the stack. The latent fragility remains: each of the suite's 9 `beforeAll` hooks compiles a full module with `synchronize: true` under Jest's 5 s default hook timeout, and `afterAll` calls `dataSource.destroy()` on a possibly unassigned variable and never closes the `TestingModule`. Since it didn't reproduce, the code was not changed (per the maestro's "fix if it shows up"). Proposed bugfix: an explicit hook timeout for that file (as `mail.module.spec.ts`/`channels.module.spec.ts` already do), `afterAll` closing the module (`module?.close()`), and building the schema once per file instead of once per `describe`.
+
+**Deliverables checklist** in `phase-03-videos.md` ticked (20 SIs + 6 full-suite checks).
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
