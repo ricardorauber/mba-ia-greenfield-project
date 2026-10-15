@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 18/20 completed
+**SIs:** 19/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -189,9 +189,15 @@
   - The integration spec exports through `ts-jest` (no plugin), so its assertions cover only what explicit decorators produce. Request-DTO completeness is guaranteed by the build-based `openapi:export` and visible in the committed file's diff.
 
 ### SI-03.18 — E2E do pipeline completo: upload → processamento → streaming/download
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `test/videos-pipeline.e2e-spec.ts` 4 passing (~25 s incl. fixture generation); full `npm run test:e2e` 93 passing (10 suites) **with the dev `video-worker` running**, which didn't process any job during the run (separate queue prefix); 0 leftover Redis `streamtube-test:*` keys, MinIO objects, multipart uploads or temp dirs
+- **Observations:**
+  - The real `WorkerModule` runs in the same Jest process (`NestFactory.createApplicationContext`) on the test prefix `streamtube-test`. Because the worker also upserts the `reconcile-videos` scheduler, `beforeAll`/`afterAll` obliterate **both** queues (`video-processing` and `video-reconciliation`).
+  - **Fixture:** a lossless (`-qp 0`, `-preset ultrafast`) 1280x720 `testsrc2` H.264 + AAC clip, regenerated with doubling duration (4 s → …) until it exceeds 64 MiB + 4 MiB, so the upload is exactly `part_count: 2`. The happy path and resume scenarios both reuse it. An MPEG-4 Part 2 clip covers the failure path.
+  - **"No byte through the API":** every `PUT` goes to the presigned URL, and the test asserts its origin equals `S3_PUBLIC_ENDPOINT` (MinIO). The API only exchanges JSON.
+  - **Resume scenario:** after part 1, the test drops all client state, reads `GET /videos/:id/upload`, computes the missing parts from `part_count` minus `uploaded_parts` (→ `[2]`), signs and uploads only part 2, then completes → `ready` with `size` equal to the file.
+  - Delivery checks: the stream `Range: bytes=0-1048575` → `206` with bytes identical to the file's first MiB. Download is read with `Range: bytes=0-0` just to check `Content-Disposition: attachment; filename="large.mp4"` without downloading ~70 MB. The thumbnail is checked for `image/jpeg`, the JPEG magic bytes, and width ≤ 1280 via the worker's `MediaToolsService.probe` on the presigned URL.
+  - The "distinct slugs" check is its own final test over the 3 videos the file creates; it relies on Jest's in-file test order.
 
 ### SI-03.20 — Documentação: seção de vídeos nos CLAUDE.md e estratégia de testes de storage/fila
 - **Status:** pending
