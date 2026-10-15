@@ -40,19 +40,18 @@ describe('Database migrations (integration)', () => {
 
     await dataSource.initialize();
 
-    await Promise.all([
-      ...MANAGED_TABLES.map((table) =>
-        dataSource.query(`DROP TABLE IF EXISTS "${table}" CASCADE`),
-      ),
-      dataSource.query(`DROP TABLE IF EXISTS "migrations" CASCADE`),
-    ]);
+    // A single statement: concurrent DROPs of FK-related tables (videos →
+    // channels → users) deadlock in Postgres.
+    const tables = [...MANAGED_TABLES, 'migrations']
+      .map((table) => `"${table}"`)
+      .join(', ');
+    await dataSource.query(`DROP TABLE IF EXISTS ${tables} CASCADE`);
     // DROP TABLE does not remove enum types; leftovers make CREATE TYPE fail
     // when the suite runs against an already-migrated database.
-    await Promise.all(
-      MANAGED_ENUM_TYPES.map((type) =>
-        dataSource.query(`DROP TYPE IF EXISTS "public"."${type}" CASCADE`),
-      ),
-    );
+    const enumTypes = MANAGED_ENUM_TYPES.map(
+      (type) => `"public"."${type}"`,
+    ).join(', ');
+    await dataSource.query(`DROP TYPE IF EXISTS ${enumTypes} CASCADE`);
   });
 
   afterAll(async () => {
