@@ -88,6 +88,24 @@ describe('parseProbeOutput', () => {
     });
   });
 
+  it('should fall back to the video stream duration when the format has none', () => {
+    const result = parseProbeOutput({
+      format: { format_name: 'webm' },
+      streams: [{ ...videoStream, duration: '4.500000' }],
+    });
+
+    expect(result.duration).toBe(4.5);
+  });
+
+  it('should prefer the format duration over the stream duration', () => {
+    const result = parseProbeOutput({
+      format,
+      streams: [{ ...videoStream, duration: '2.900000' }],
+    });
+
+    expect(result.duration).toBe(3);
+  });
+
   it.each([
     ['no streams', { format, streams: [] }],
     ['only audio', { format, streams: [audioStream] }],

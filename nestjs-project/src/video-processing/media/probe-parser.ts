@@ -1,7 +1,10 @@
 import { MediaToolError } from './media-tool-error';
 
 export interface ProbeResult {
-  /** Seconds; `null` when the container does not declare it (e.g. still images). */
+  /**
+   * Seconds, from the container or else the video stream; `null` when neither
+   * declares it (e.g. still images).
+   */
   duration: number | null;
   size: number | null;
   format_name: string;
@@ -19,6 +22,7 @@ interface FfprobeStream {
   width?: number;
   height?: number;
   avg_frame_rate?: string;
+  duration?: string;
 }
 
 interface FfprobeOutput {
@@ -56,7 +60,7 @@ export function parseProbeOutput(json: unknown): ProbeResult {
   }
 
   return {
-    duration: toNumber(output.format?.duration),
+    duration: toNumber(output.format?.duration) ?? toNumber(video.duration),
     size: toNumber(output.format?.size),
     format_name: output.format?.format_name ?? '',
     bit_rate: toNumber(output.format?.bit_rate),

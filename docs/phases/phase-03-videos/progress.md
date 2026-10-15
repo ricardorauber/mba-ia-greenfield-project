@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 12/20 completed
+**SIs:** 13/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -122,10 +122,16 @@
   - Scenario 1.3 (TTL=600) compiles a second `AppModule` instance after setting `process.env.S3_UPLOAD_PART_URL_TTL_SECONDS = '600'`. The `registerAs` factories read `process.env` at compile time, so the new value applies; the original is restored in that block's `afterAll`. The e2e file has a local `createApp()` to build both instances with the `main.ts` global config.
 
 ### SI-03.15 — VideoProcessingService: extração de metadados e geração de thumbnail
-- **Status:** pending
-- **Tests:** —
+- **Status:** completed
+- **Tests:** 52 passing across 4 suites (`playback-allowlist.spec.ts`, `video-processing.service.spec.ts`, `video-processing.service.integration-spec.ts` 7 with real Postgres + MinIO + FFmpeg ~12 s, and `media/probe-parser.spec.ts` with 2 new cases); fix loop 1/3; 0 leftover fixture dirs and 0 leftover objects under `videos/`
 - **Observations:**
-  - **Maestro decision (from the SI-03.14 review, to apply here):** when `format.duration` is missing, fall back to the video stream's `duration`; if neither exists, treat it as a permanent `invalid_media` error (a `ready` video always has a duration). Storage 404 stays `transient`, as planned.
+  - **Maestro decision (from the SI-03.14 review), applied:** `parseProbeOutput` (SI-03.14 file) falls back to the video stream's `duration` when `format.duration` is missing (format still takes precedence; 2 new parser cases). `VideoProcessingService` throws `PermanentProcessingError('invalid_media')` when neither exists, before extracting a thumbnail. Storage 404 stays `transient`, as planned.
+  - `MediaToolError('invalid_media')` becomes `PermanentProcessingError('invalid_media')` for both `probe` **and** `extractFrame` (the plan names only `probe`; a frame that cannot be decoded is just as permanent). `transient` media errors, storage errors and a missing original after `headObject` are rethrown unchanged so BullMQ retries them.
+  - `process()` only throws; marking the video `failed` is the consumer's job (`@OnWorkerEvent('failed')`, SI-03.16), per the Events/Messages spec. A lost `markReady` transition (returns `false`) is logged as a warning, not thrown.
+  - `assertPlayable` matches the container against the comma-separated items of `format_name` (`mov,mp4,…` / `matroska,webm`) instead of a raw substring, so e.g. `notmp4` does not pass. The thumbnail is stored before `headObject`/`markReady`; on a retry it is simply overwritten.
+  - **Fix attempt 1 (test-only):** the integration test checked the thumbnail's `Content-Type` and ETag with `HEAD` on a presigned URL, which MinIO rejects with 403 because the signature covers GET only. It now reads headers through a 1-byte ranged GET (`206`). Service code unchanged.
+  - The integration spec adds `TypeOrmModule.forFeature([User])` (same `Channel#user` module-graph gap noted in SI-03.8); `VideoProcessingModule` imports `VideosModule`, so the worker graph in SI-03.16 inherits the gap.
+  - `VideoProcessingModule` exports `VideoProcessingService` so the worker module (SI-03.16) can consume it; it has no `@Processor`.
 
 ### SI-03.12 — Endpoint POST /videos/:id/upload/complete (conclusão + disparo do processamento)
 - **Status:** pending
