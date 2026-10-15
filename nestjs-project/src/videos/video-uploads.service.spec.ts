@@ -2,10 +2,12 @@ import type { ChannelsService } from '../channels/channels.service';
 import type { Channel } from '../channels/entities/channel.entity';
 import type { StorageService } from '../storage/storage.service';
 import type { CreateVideoDto } from './dto/create-video.dto';
-import type { Video } from './entities/video.entity';
+import { type Video, VideoStatus } from './entities/video.entity';
 import {
   ChannelNotFoundException,
+  InvalidVideoStatusException,
   UnsupportedVideoFormatException,
+  VideoNotFoundException,
   VideoTooLargeException,
 } from './exceptions/video.exceptions';
 import { VideoUploadsService } from './video-uploads.service';
@@ -15,11 +17,12 @@ const MIB = 1024 ** 2;
 const TEN_GIB = 10 * 1024 ** 3;
 
 describe('VideoUploadsService', () => {
-  let videosService: { createDraft: jest.Mock };
+  let videosService: { createDraft: jest.Mock; findOwnedOrFail: jest.Mock };
   let channelsService: { findByUserId: jest.Mock };
   let storageService: {
     createMultipartUpload: jest.Mock;
     abortMultipartUpload: jest.Mock;
+    listParts: jest.Mock;
   };
   let service: VideoUploadsService;
   const channel = { id: 'channel-id' } as Channel;
@@ -33,11 +36,15 @@ describe('VideoUploadsService', () => {
   });
 
   beforeEach(() => {
-    videosService = { createDraft: jest.fn().mockResolvedValue(video) };
+    videosService = {
+      createDraft: jest.fn().mockResolvedValue(video),
+      findOwnedOrFail: jest.fn(),
+    };
     channelsService = { findByUserId: jest.fn().mockResolvedValue(channel) };
     storageService = {
       createMultipartUpload: jest.fn().mockResolvedValue('upload-id'),
       abortMultipartUpload: jest.fn().mockResolvedValue(undefined),
+      listParts: jest.fn(),
     };
     service = new VideoUploadsService(
       videosService as unknown as VideosService,
@@ -180,5 +187,88 @@ describe('VideoUploadsService', () => {
 
       expect(upload).toEqual({ part_size: 64 * MIB, part_count: parts });
     });
+  });
+
+  describe('getUploadStatus', () => {
+    const draft = (overrides: Partial<Video> = {}): Video =>
+      ({
+        id: 'video-id',
+        status: VideoStatus.Draft,
+        declared_size: 2 * 64 * MIB + 1,
+        upload_id: 'upload-id',
+        ...overrides,
+      }) as Video;
+
+    it.each([VideoStatus.Processing, VideoStatus.Ready, VideoStatus.Failed])(
+      'should reject a video in %s',
+      async (status) => {
+        videosService.findOwnedOrFail.mockResolvedValue(draft({ status }));
+
+        await expect(
+          service.getUploadStatus('user-id', 'video-id'),
+        ).rejects.toBeInstanceOf(InvalidVideoStatusException);
+        expect(storageService.listParts).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should propagate VideoNotFoundException before checking the status', async () => {
+      videosService.findOwnedOrFail.mockRejectedValue(
+        new VideoNotFoundException(),
+      );
+
+      await expect(
+        service.getUploadStatus('user-id', 'video-id'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+
+    it('should list the stored parts of the video original', async () => {
+      videosService.findOwnedOrFail.mockResolvedValue(draft());
+      storageService.listParts.mockResolvedValue([
+        { partNumber: 1, size: 64 * MIB, etag: '"a"' },
+        { partNumber: 3, size: 1, etag: '"c"' },
+      ]);
+
+      const status = await service.getUploadStatus('user-id', 'video-id');
+
+      expect(storageService.listParts).toHaveBeenCalledWith(
+        'videos/video-id/original',
+        'upload-id',
+      );
+      expect(status).toEqual({
+        part_size: 64 * MIB,
+        part_count: 3,
+        uploaded_parts: [
+          { part_number: 1, size: 64 * MIB },
+          { part_number: 3, size: 1 },
+        ],
+      });
+    });
+
+    it('should report no parts when the multipart upload no longer exists', async () => {
+      videosService.findOwnedOrFail.mockResolvedValue(draft());
+      storageService.listParts.mockResolvedValue(null);
+
+      const status = await service.getUploadStatus('user-id', 'video-id');
+
+      expect(status.uploaded_parts).toEqual([]);
+    });
+
+    it.each([
+      [1, 1],
+      [64 * MIB, 1],
+      [TEN_GIB, 160],
+    ])(
+      'should derive part_count from a declared size of %i bytes as %i',
+      async (declaredSize, parts) => {
+        videosService.findOwnedOrFail.mockResolvedValue(
+          draft({ declared_size: declaredSize }),
+        );
+        storageService.listParts.mockResolvedValue([]);
+
+        const status = await service.getUploadStatus('user-id', 'video-id');
+
+        expect(status.part_count).toBe(parts);
+      },
+    );
   });
 });

@@ -4,9 +4,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ChannelsService } from '../channels/channels.service';
 import { StorageService } from '../storage/storage.service';
 import type { CreateVideoDto } from './dto/create-video.dto';
-import type { Video } from './entities/video.entity';
+import { type Video, VideoStatus } from './entities/video.entity';
 import {
   ChannelNotFoundException,
+  InvalidVideoStatusException,
   UnsupportedVideoFormatException,
   VideoTooLargeException,
 } from './exceptions/video.exceptions';
@@ -27,6 +28,15 @@ export interface UploadPlan {
 export interface InitiatedUpload {
   video: Video;
   upload: UploadPlan;
+}
+
+export interface UploadedPartStatus {
+  part_number: number;
+  size: number;
+}
+
+export interface UploadStatus extends UploadPlan {
+  uploaded_parts: UploadedPartStatus[];
 }
 
 /** Upload flow: the API only coordinates; the bytes go straight to storage. */
@@ -87,6 +97,38 @@ export class VideoUploadsService {
     }
 
     return { video, upload: this.uploadPlan(dto.size) };
+  }
+
+  /** What is already in storage, so an interrupted upload can resume (TD-07). */
+  async getUploadStatus(userId: string, id: string): Promise<UploadStatus> {
+    const video = await this.findOwnedDraftOrFail(userId, id);
+
+    // `null` = the multipart upload is gone, so nothing is stored yet
+    const parts =
+      (await this.storageService.listParts(
+        videoOriginalKey(id),
+        video.upload_id,
+      )) ?? [];
+
+    return {
+      ...this.uploadPlan(video.declared_size),
+      uploaded_parts: parts.map((part) => ({
+        part_number: part.partNumber,
+        size: part.size,
+      })),
+    };
+  }
+
+  // Ownership is checked first so non-owners always get 404, never 409
+  private async findOwnedDraftOrFail(
+    userId: string,
+    id: string,
+  ): Promise<Video> {
+    const video = await this.videosService.findOwnedOrFail(userId, id);
+    if (video.status !== VideoStatus.Draft) {
+      throw new InvalidVideoStatusException();
+    }
+    return video;
   }
 
   private uploadPlan(declaredSize: number): UploadPlan {

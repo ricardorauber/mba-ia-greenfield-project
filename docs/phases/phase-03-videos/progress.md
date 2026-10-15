@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 10/20 completed
+**SIs:** 11/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -103,9 +103,14 @@
   - The 404 test asserts that the stranger's 404 body and the random-UUID 404 body are byte-identical (`toEqual`), covering the "doesn't leak existence" AC.
 
 ### SI-03.10 — Endpoint GET /videos/:id/upload (estado para retomada)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 28 passing in `video-uploads.service.spec.ts` + `video-uploads.service.integration-spec.ts` (10 new unit cases, 1 new integration case against real MinIO); e2e `test/videos-upload-status.e2e-spec.ts` 4 passing; 0 leftover multipart uploads
+- **Observations:**
+  - **Spec deviation:** scenario 1.2 of `specs/videos-upload-status.plan.md` gets its part URLs from `POST /videos/:id/upload/part-urls`, which only exists after SI-03.11 (both SIs depend only on SI-03.8). The e2e signs the two URLs with `StorageService.presignUploadPart` (the same public client the endpoint will use) and then PUTs 5 MiB / 1 MiB as specified. Once SI-03.11 lands, the scenario can switch to the endpoint.
+  - The status guard lives in a private `findOwnedDraftOrFail` (ownership first, then `draft`), so non-owners always get 404 and never 409. SI-03.11 and SI-03.12 can reuse it.
+  - **Fixed a latent leak in the SI-03.8 integration spec:** its `afterAll` looked up each video's `upload_id` in the DB, but `beforeEach` wipes the rows, so with a second test the first test's multipart upload would never be aborted. Now `upload_id`s are recorded in a Map at creation, as the e2e suites do.
+  - `UploadStatus`/`UploadedPartStatus` are plain interfaces in the service; `UploadStatusResponseDto.from` maps them, mirroring `CreateVideoResponseDto`.
+  - `prettier --write` and the ESLint `prettier/prettier` rule disagreed on one block of the e2e file (`update(...)` call wrapping); `eslint --fix` resolved it, and both now pass.
 
 ### SI-03.11 — Endpoint POST /videos/:id/upload/part-urls (URLs pré-assinadas de partes)
 - **Status:** pending

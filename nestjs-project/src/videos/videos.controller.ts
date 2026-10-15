@@ -21,6 +21,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
+import { UploadStatusResponseDto } from './dto/upload-status-response.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
 import { VideoUploadsService } from './video-uploads.service';
 import { VideosService } from './videos.service';
@@ -108,5 +109,45 @@ export class VideosController {
   ): Promise<VideoResponseDto> {
     const video = await this.videosService.findOwnedOrFail(user.sub, id);
     return VideoResponseDto.fromEntity(video);
+  }
+
+  @Get(':id/upload')
+  @ApiOperation({
+    summary: 'Get the upload status',
+    description:
+      'Lists the parts already stored for a draft, so an interrupted upload can resume by sending only the missing parts.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Upload part plan and the parts already stored',
+    type: UploadStatusResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'VALIDATION_ERROR — `id` is not a UUID',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'VIDEO_NOT_FOUND — the video does not exist or belongs to another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'INVALID_VIDEO_STATUS — the video is no longer a draft',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async getUploadStatus(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<UploadStatusResponseDto> {
+    const status = await this.videoUploadsService.getUploadStatus(user.sub, id);
+    return UploadStatusResponseDto.from(status);
   }
 }

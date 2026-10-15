@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { ConfigModule } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -20,7 +21,8 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
   let dataSource: DataSource;
   let uploads: VideoUploadsService;
   let storage: StorageService;
-  const createdVideoIds: string[] = [];
+  // id → upload_id, captured at creation: beforeEach wipes the rows
+  const createdUploads = new Map<string, string>();
 
   beforeAll(async () => {
     module = await Test.createTestingModule({
@@ -38,14 +40,8 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
   });
 
   afterAll(async () => {
-    for (const id of createdVideoIds) {
-      const video = await dataSource.getRepository(Video).findOneBy({ id });
-      if (video) {
-        await storage.abortMultipartUpload(
-          videoOriginalKey(id),
-          video.upload_id,
-        );
-      }
+    for (const [id, uploadId] of createdUploads) {
+      await storage.abortMultipartUpload(videoOriginalKey(id), uploadId);
       await storage.deletePrefix(videoPrefix(id));
     }
     await cleanAllTables(dataSource);
@@ -80,7 +76,7 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
       mime_type: 'video/mp4',
       size: 1048576,
     });
-    createdVideoIds.push(video.id);
+    createdUploads.set(video.id, video.upload_id);
 
     const row = await dataSource.getRepository(Video).findOneByOrFail({
       id: video.id,
@@ -96,5 +92,43 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
     await expect(
       storage.listParts(videoOriginalKey(video.id), row.upload_id),
     ).resolves.toEqual([]);
+  });
+
+  it('should report exactly the parts PUT through presigned part URLs', async () => {
+    const { user } = await createChannelOwner();
+    const { video } = await uploads.initiate(user.id, {
+      file_name: 'clip.mp4',
+      mime_type: 'video/mp4',
+      size: 2 * 67108864 + 1,
+    });
+    createdUploads.set(video.id, video.upload_id);
+    const key = videoOriginalKey(video.id);
+
+    for (const [partNumber, size] of [
+      [1, 5 * 1024 * 1024],
+      [3, 1024 * 1024],
+    ] as const) {
+      const { url } = await storage.presignUploadPart(
+        key,
+        video.upload_id,
+        partNumber,
+      );
+      const res = await fetch(url, {
+        method: 'PUT',
+        body: new Uint8Array(randomBytes(size)),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    const status = await uploads.getUploadStatus(user.id, video.id);
+
+    expect(status).toEqual({
+      part_size: 67108864,
+      part_count: 3,
+      uploaded_parts: [
+        { part_number: 1, size: 5 * 1024 * 1024 },
+        { part_number: 3, size: 1024 * 1024 },
+      ],
+    });
   });
 });
