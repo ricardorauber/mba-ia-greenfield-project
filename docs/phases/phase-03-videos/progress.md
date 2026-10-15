@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 8/20 completed
+**SIs:** 9/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -83,9 +83,16 @@
   - Wrote one throwaway log to the host's `/tmp/full.log` while diagnosing (should have used the session scratchpad); it is outside the repo.
 
 ### SI-03.14 — MediaToolsService: wrapper tipado de ffprobe/ffmpeg
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 34 passing across 3 suites (`probe-parser.spec.ts`, `media-tool-error.spec.ts`, `media-tools.service.integration-spec.ts` with real ffmpeg 5.1.9 + MinIO, ~9 s); 0 leftover fixture dirs
+- **Observations:**
+  - `ProbeResult` uses the snake_case names of `VideoMetadata` (`video_codec`, `audio_codec`, `format_name`, `bit_rate`, `frame_rate`) plus `duration`/`size`/`width`/`height`, so SI-03.15 can map it straight into `markReady`. `duration` is `number | null`, because ffprobe omits it for some inputs (e.g. the JPEG the test probes to check the thumbnail size). SI-03.15's `assertPlayable` must decide what a missing duration means.
+  - `frame_rate` is the raw fraction result (`30000/1001` → 29.97002997…), not rounded; the plan doesn't specify rounding.
+  - `extractFrame` throws `MediaToolError('invalid_media')` when ffmpeg exits 0 but writes no bytes (e.g. a seek past the end), so the caller never stores an empty thumbnail.
+  - `probe` maps unparseable JSON output to `invalid_media`. A process killed by the `execFile` timeout is always `transient`, even if stderr matches a "permanent" pattern.
+  - An HTTP 404 from storage (missing object) classifies as `transient`, following the plan's "all others → transient" rule. In practice SI-03.15 only probes after `HeadObject` succeeded at completion, so a 404 there would mean the object vanished. Retrying until attempts run out (→ `processing_error`) seems acceptable; if a 404 should fail fast as permanent instead, that's a plan decision.
+  - `MediaToolsService` is a bare `@Injectable()` with no module of its own; the plan wires it into the worker graph in SI-03.15/03.16.
+  - Fixtures: the 1080p clip is 1 s long with `-preset ultrafast`, and the VP9 clip uses `-deadline realtime`, to keep generation fast (whole integration suite ~9 s). The corrupt `.mp4` is the first 1 KiB of the H.264 fixture; ffmpeg writes the `moov` atom at the end, so the head alone triggers `moov atom not found`.
 
 ### SI-03.9 — Endpoint GET /videos/:id (leitura do dono)
 - **Status:** pending
