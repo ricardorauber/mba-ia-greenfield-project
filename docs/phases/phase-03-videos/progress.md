@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 2/20 completed
+**SIs:** 3/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -22,9 +22,10 @@
   - Extra validation cases beyond the plan's list: TTL above the 7-day SigV4 cap, non-URI `S3_ENDPOINT`, out-of-range `REDIS_PORT`.
 
 ### SI-03.3 — DatabaseModule e opções de ConfigModule compartilhadas entre API e worker
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 2 passing (`database.module.integration-spec.ts`); regressions green: `src/auth` 73 (6 suites), e2e 52 (3 suites, incl. `GET /`)
+- **Observations:**
+  - **Pre-existing flake (out of scope):** on the first, cold run of `src/auth`, `auth.service.integration-spec.ts` timed out in `beforeAll` (`createAuthTestModule()` > Jest's 5000 ms default), and `afterAll` then crashed on `dataSource.destroy()` because `dataSource` was never assigned. It passed on an unchanged re-run. That suite builds its own `ConfigModule`/`TypeOrmModule` and doesn't import anything this SI touched. Separate task: give its `beforeAll` a longer timeout and guard `afterAll` with `dataSource?.destroy()`.
 
 ### SI-03.4 — StorageModule: clientes S3 interno/público, multipart e URLs pré-assinadas
 - **Status:** pending
