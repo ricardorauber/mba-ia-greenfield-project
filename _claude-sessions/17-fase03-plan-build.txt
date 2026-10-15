@@ -1,0 +1,1104 @@
+=== session 4898dc94-4520-452b-bcd2-00edec66f1e7 model=claude-opus-5-5 cwd=/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube
+● Bash(ls docs docs/phases docs/phases/* docs/decisions docs/rules 2>/dev/null; ls .claude/skills/plan-build .claude/skills/plan-build/templates .claude/skills/plan-build/templates/tech-specs; ls .claude/skills)
+  ⎿  docs:
+     decisions
+     design-system-ai-implementable.md
+     design-system-pillars.md
+     diagrams
+     figma-audit.json
+     inventories
+     phases
+     project-plan.md
+     tasks
+     
+     docs/decisions:
+     technical-decisions-next-frontend-config-base.md
+     technical-decisions-next-frontend-msw-foundation.md
+     technical-decisions-next-frontend-openapi-typing.md
+     technical-decisions-openapi-docs-nestjs.md
+     technical-decisions-phase-01-configuracao-base.md
+     technical-decisions-phase-02-auth-frontend.md
+     technical-decisions-phase-02-auth.md
+     technical-decisions-phase-03-videos.md
+     
+     docs/phases:
+     phase-01-configuracao-base
+     phase-02-auth
+     phase-02-auth-frontend
+     phase-03-videos
+     
+     docs/phases/phase-01-configuracao-base:
+     context.md
+     phase-01-configuracao-base.md
+     progress.md
+     validation.md
+     
+     docs/phases/phase-02-auth:
+     context.md
+     phase-02-auth.md
+     progress.md
+     validation.md
+     
+     docs/phases/phase-02-auth-frontend:
+     context.md
+     frontend-drift-report.md
+     library-refs.md
+     phase-02-auth-frontend.md
+     progress.md
+     validation.md
+     
+     docs/phases/phase-03-videos:
+     context.md
+     library-refs.md
+     validation.md
+     .claude/skills/plan-build:
+     SKILL.md
+     phase-a.md
+     phase-b.md
+     phase-c.md
+     references
+     templates
+     
+     .claude/skills/plan-build/templates:
+     frontend-runtime-si.md
+     screen-si.md
+     tech-specs
+     
+     .claude/skills/plan-build/templates/tech-specs:
+     api-contracts.md
+     auth-matrix.md
+     data-model.md
+     error-catalog.md
+     events-messages.md
+     frontend-runtime.md
+     traceability-matrix.md
+     ui-contracts.md
+     decide
+     figma-apply-tokens-tailwind-v4
+     figma-audit-tokens
+     generate-test-guide
+     implement
+     implement-phase
+     nestjs-best-practices
+     next-best-practices
+     plan-build
+     plan-context
+     plan-phase
+     plan-pipeline
+     plan-resolve
+     plan-rule-author
+     plan-test-specs
+     plan-validate
+     playwright-cli
+     research
+     screen-inventory
+     testing-guide-nestjs-project
+     testing-guide-next-frontend
+     typeorm
+     vercel-react-best-practices
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-pipeline/SKILL.md)
+  ⎿  1	---
+     2	name: plan-pipeline
+     3	description: "Entry point and shared conventions for the plan pipeline (phase and task modes). Invoke directly when the user asks about planning without specifying a stage — this skill orients them to the pipeline stages (context → validate → resolve → build → specs [optional]). For actual work, use the stage skills: plan-context, plan-validate, plan-resolve, plan-build, plan-test-specs."
+     4	disable-model-invocation: true
+     5	---
+     6	
+     7	# Plan Pipeline Overview
+     8	
+     9	Planning is a pipeline of up to **five stages** that works for both project phases and ad-hoc tasks. Each stage is a separate skill with one responsibility and one artifact. Stages 1-4 (context → validate → resolve → build) are the canonical happy path; Stage 5 (`/plan-test-specs`) is optional and only fires when the build emitted spec placeholders. The stages share the conventions defined below — every stage skill references this document instead of repeating them.
+     10	
+     11	```
+     12	/research [opcional em task mode]       → docs/decisions/technical-decisions-{slug}.md
+     13	/plan-context <NN | slug | "prose">     → docs/{phases|tasks}/{dir}/context.md
+     14	/plan-validate <NN | slug>              → docs/{phases|tasks}/{dir}/validation.md
+     15	/plan-resolve <NN | slug>               → edits decisions doc + context.md + validation.md + library-refs.md
+     16	/plan-validate <NN | slug>              → re-run until status: clean
+     17	/plan-build <NN | slug>                 → docs/{phases|tasks}/{dir}/{name}.md
+     18	/plan-test-specs <NN | slug>                 → <subproject>/specs/<scenario>.plan.md
+     19	```
+     20	
+     21	When the user asks generically to "plan phase NN" or "plan this task", direct them to `/plan-context <arg>` first. Each stage aborts with an explicit next-command when a precondition is missing, so the pipeline self-guides once started.
+     22	
+     23	**Alternative front-door — `/decide`.** When the user input is a free-text need rather than a structured pipeline argument (e.g., "quero mudar X", "tem de … (+32696 chars)
+● Bash(head -30 docs/phases/phase-03-videos/context.md; echo ----; head -30 docs/phases/phase-03-videos/validation.md; echo ----; head -30 docs/decisions/technical-decisions-phase-03-videos.md; echo; grep -l "scope_type: phase" docs/decisions/*.md; grep -n "related_phases" docs/decisions/*.md; ls docs/rules 2>&1; ls .claude/skills/plan-build/references)
+  ⎿  ---
+     kind: phase
+     name: phase-03-videos
+     sources_mtime:
+       docs/project-plan.md: "2026-10-15T13:27:03-03:00"
+       docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+       docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-01-configuracao-base/context.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-02-auth/context.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-02-auth-frontend/context.md: "2026-10-15T13:28:45-03:00"
+       .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-10-15T13:27:02-03:00"
+     ---
+     
+     # phase-03-videos — Context
+     
+     ## Scope
+     
+     **Phase name:** Fase 03 — Upload e Processamento de Vídeos
+     
+     **Capabilities** (literal, `docs/project-plan.md`):
+     
+     - Serviço de armazenamento de arquivos (vídeos e thumbnails)
+     - Serviço de processamento em segundo plano (filas)
+     - Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+     - Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+     - Processamento automático do vídeo após upload (extração de duração e metadados)
+     - Geração automática de thumbnail a partir de um frame do vídeo
+     - URL única por vídeo, sem conflito com outros vídeos
+     - Reprodução via streaming (sem necessidade de download completo)
+     - Download do vídeo pelo usuário
+     ----
+     ---
+     kind: phase
+     name: phase-03-videos
+     status: clean
+     issue_count: 0
+     sources_mtime:
+       docs/phases/phase-03-videos/context.md: "2026-10-15T14:18:42-03:00"
+       docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+     issues:
+       - id: AMB-1
+         status: resolved
+         summary: "UI side of streaming/download/upload neither inventoried, deferred, nor Non-UI"
+         resolved_by: deferred_capability
+       - id: AMB-2
+         status: resolved
+         summary: "Draft pre-registration: owner (user vs channel) and initial fields undefined"
+         resolved_by: phase-03-videos/TD-10
+       - id: AMB-3
+         status: resolved
+         summary: "Processing outputs unspecified: which metadata fields, which  … (+5495 chars)
+● Bash(for f in docs/phases/phase-03-videos/context.md docs/decisions/technical-decisions-phase-03-videos.md docs/project-plan.md docs/decisions/technical-decisions-openapi-docs-nestjs.md docs/phases/phase-01-configuracao-base/context.md docs/phases/phase-02-auth/context.md docs/phases/phase-02-auth-frontend/context.md .claude/skills/testing-guide-nestjs-project/SKILL.md docs/phases/phase-03-videos/library-refs.md; do echo "$f $(stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%S%z' $f)"; done; wc -l docs/phases/phase-03-videos/*.md; grep -nP '^\|.*\| decided \|.*\| [^—]' docs/phases/phase-03-videos/context.md | hea … (+56 chars))
+  ⎿  docs/phases/phase-03-videos/context.md 2026-10-15T14:18:42-0300
+     docs/decisions/technical-decisions-phase-03-videos.md 2026-10-15T14:18:05-0300
+     docs/project-plan.md 2026-10-15T13:27:03-0300
+     docs/decisions/technical-decisions-openapi-docs-nestjs.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-01-configuracao-base/context.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-02-auth/context.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-02-auth-frontend/context.md 2026-10-15T13:28:45-0300
+     .claude/skills/testing-guide-nestjs-project/SKILL.md 2026-10-15T13:27:02-0300
+     docs/phases/phase-03-videos/library-refs.md 2026-10-15T14:18:42-0300
+          416 docs/phases/phase-03-videos/context.md
+          206 docs/phases/phase-03-videos/library-refs.md
+          176 docs/phases/phase-03-videos/validation.md
+          798 total
+     grep: invalid option -- P
+     usage: grep [-abcdDEFGHhIiJLlMmnOopqRSsUVvwXxZz] [-A num] [-B num] [-C[num]]
+     	[-e pattern] [-f file] [--binary-files=value] [--color=when]
+     	[--context[=num]] [--directories=action] [--label] [--line-buffered]
+     	[--null] [pattern] [file ...]
+     16:## Scope
+     47:## Decisions Index
+     71:## Capability Coverage
+     85:## Decisions Detail
+     217:## Inherited Decisions Detail
+     364:## Inherited Conventions
+     373:## Inherited Deferred Capabilities
+     384:## Non-UI / Deferred Capabilities
+     392:## Testing Requirements
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-build/phase-a.md)
+  ⎿  1	# Plan Pipeline — Stage 4: Build → Phase A (Scaffold + Technical Specifications)
+     2	
+     3	This file is loaded by `.claude/skills/plan-build/SKILL.md` after Gate 10 dispatches a fresh build (or `--rebuild`). Read SKILL.md for preflight gates, dispatcher rules, hard rules, output contract, and rerun semantics — they apply to every phase.
+     4	
+     5	Phase A writes the artifact scaffold + Technical Specifications subsections + four sentinelas, then pauses at A5 for the user to confirm continuation into Phase B.
+     6	
+     7	The detected `mode`, `identifier`, `slug`, `{target_dir}`, `{target_path}`, parsed context.md frontmatter (including `state:` markers), `library_refs_required`, and `ui_in_scope` are all carried forward from SKILL.md's preflight gates — Phase A does NOT re-run those checks.
+     8	
+     9	## A1. Read context.md (single full read)
+     10	
+     11	Read `{target_dir}/context.md` in full. This is the only full read of context.md in the entire run. All TD information (Recommendation prose + Libraries) is carried in `## Decisions Detail` (current-scope TDs) and `## Inherited Decisions Detail` (inherited TDs), both loaded during this single read and kept in working memory through Phase A and Phase B (when both phases run in the same session).
+     12	
+     13	**Kind sanity-check (defensive).** Re-confirm the `kind:` inferred in Gate 3 against the now-fully-loaded frontmatter — if they disagree (should never happen, since Gate 3 already validated), abort: `"FAILED at input-parse. Written so far: none. Error: kind mismatch between context.md frontmatter ({inferred_kind}) and target_path ({path}). Next: rerun /plan-build {identifier} after reconfirming context.md was generated for the right mode."`
+     14	
+     15	**ui_in_scope cross-check.** Validate that the value computed in Gate 9 still matches a fresh `Grep -n '^## UI Inventory$' {target_dir}/context.md`. On contradiction, abort: `"FAILED at input-parse. Written so far: none. Error: ui_in_scope mismatch between input ({value}) and context.md state ({detected … (+22796 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	sources_mtime:
+     5	  docs/project-plan.md: "2026-10-15T13:27:03-03:00"
+     6	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+     7	  docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-15T13:28:45-03:00"
+     8	  docs/phases/phase-01-configuracao-base/context.md: "2026-10-15T13:28:45-03:00"
+     9	  docs/phases/phase-02-auth/context.md: "2026-10-15T13:28:45-03:00"
+     10	  docs/phases/phase-02-auth-frontend/context.md: "2026-10-15T13:28:45-03:00"
+     11	  .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-10-15T13:27:02-03:00"
+     12	---
+     13	
+     14	# phase-03-videos — Context
+     15	
+     16	## Scope
+     17	
+     18	**Phase name:** Fase 03 — Upload e Processamento de Vídeos
+     19	
+     20	**Capabilities** (literal, `docs/project-plan.md`):
+     21	
+     22	- Serviço de armazenamento de arquivos (vídeos e thumbnails)
+     23	- Serviço de processamento em segundo plano (filas)
+     24	- Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+     25	- Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+     26	- Processamento automático do vídeo após upload (extração de duração e metadados)
+     27	- Geração automática de thumbnail a partir de um frame do vídeo
+     28	- URL única por vídeo, sem conflito com outros vídeos
+     29	- Reprodução via streaming (sem necessidade de download completo)
+     30	- Download do vídeo pelo usuário
+     31	
+     32	**Out of scope:** _Not specified._
+     33	
+     34	**Deliverables:** upload de até 10GB funcional, processamento automático do vídeo, streaming funcionando, URLs únicas geradas.
+     35	
+     36	**Affected subprojects:** _None named explicitly for this phase in project-plan.md._
+     37	
+     38	**Deferred subprojects:** _None._
+     39	
+     40	**Sequencing notes:** "> Depende de: Fase 01, Fase 02". Intro sentence: "Upload de arquivos grandes sem travar o sistema, processamento automático do vídeo e geração de URL única."
+     41	
+     42	**Neighbors (for boundary detection only):**
+     43	
+     44	- **Phase 02:** Cadastro, Login e Gerenciamento de Cont … (+38158 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-build/phase-b.md)
+  ⎿  1	# Plan Pipeline — Stage 4: Build → Phase B (SIs + Dependency Map + Deliverables)
+     2	
+     3	This file is loaded by `.claude/skills/plan-build/SKILL.md` after Gate 10 dispatches a resume (case 2: both required sentinelas present), OR after Phase A's A5 pause when the user picks "Continue now". Read SKILL.md for preflight gates, dispatcher rules, hard rules, output contract, and rerun semantics — they apply to every phase.
+     4	
+     5	Phase B runs in two scenarios with **different B1 cost profiles**:
+     6	
+     7	- **Same-session continuation** — user picked "Continue now" in A5. `context.md` was fully read at A1 in the same conversation, and each Tech Spec subsection was emitted as an `Edit` `new_string` argument during A4 → both are present in the message log. **B1 is a no-op**; the model proceeds directly to B2 with the inherited working memory.
+     8	- **New-session resume** — Gate 10 detected the sentinelas; the model entered Phase B fresh with no Phase A working memory. **B1(a) and B1(b) are both mandatory.**
+     9	
+     10	## B1. Load Phase B inputs (only on new-session resume)
+     11	
+     12	Skip this entire step in same-session continuation. On new-session resume, run both sub-reads:
+     13	
+     14	(a) **`{target_dir}/context.md`** — single full read. Loads `## Decisions Detail` and `## Inherited Decisions Detail` (B4's TD lookups), the scope sections (`## Capability Coverage` + capability bullets in phase mode; `## Scope` prose in task mode — B2's decomposition), the `**Affected subprojects:**` field within `## Scope` (B6's Deliverables command parameterization), and `## Testing Requirements` (per-subproject test command hints for B6).
+     15	
+     16	(b) **`## Technical Specifications` from `{target_path}`** — bounded read of the section Phase A wrote. Locate via `Grep -n '^## Technical Specifications$\|^## Dependency Map$' {target_path}` to get the start and end line numbers (Dep Map heading always sits immediately after Tech Specs, even when its body is still the sentinela). `Read` the line range between them.  … (+56400 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/library-refs.md)
+  ⎿  1	---
+     2	libs:
+     3	  "@nestjs/bullmq":
+     4	    version: "12.0.0"
+     5	    context7_id: "/nestjs/bull"
+     6	    fetched_at: "2026-10-15T14:12:01-03:00"
+     7	  bullmq:
+     8	    version: "6.3.15"
+     9	    context7_id: "/taskforcesh/bullmq"
+     10	    fetched_at: "2026-10-15T14:12:01-03:00"
+     11	  ioredis:
+     12	    version: "6.0.0"
+     13	    context7_id: "/redis/ioredis/v6.0.0"
+     14	    fetched_at: "2026-10-15T14:12:01-03:00"
+     15	  "@aws-sdk/client-s3":
+     16	    version: "3.1152.0"
+     17	    context7_id: "/aws/aws-sdk-js-v3"
+     18	    fetched_at: "2026-10-15T14:12:01-03:00"
+     19	  "@aws-sdk/s3-request-presigner":
+     20	    version: "3.1152.0"
+     21	    context7_id: "/aws/aws-sdk-js-v3"
+     22	    fetched_at: "2026-10-15T14:12:01-03:00"
+     23	sources_mtime:
+     24	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+     25	---
+     26	
+     27	# phase-03-videos — Library References
+     28	
+     29	Distilled docs for the libraries decided in this slice, pulled through Context7 on 2026-10-15. Versions are **exact pins**, checked with `npm view` against the dev image (`node:25.6.0-slim`, Debian 12) and the installed `@nestjs/core` 11.1.16. Resolve refreshes this file when the library set in `## Decisions Index` drifts from the set cached here.
+     30	
+     31	## @nestjs/bullmq
+     32	
+     33	**Source:** `/nestjs/bull` (Context7), maps to `phase-03-videos/TD-01`. **Pin:** `12.0.0`, published 2026-08-27. Peer dependencies: `@nestjs/common` / `@nestjs/core` `^10 || ^11 || ^12` and `bullmq` `^3 … ^6`, so it works with Nest 11. It depends on `@nestjs/bull-shared@^12.0.0`.
+     34	
+     35	### Root connection (async, from the config namespace)
+     36	
+     37	```ts
+     38	import { BullModule } from '@nestjs/bullmq';
+     39	
+     40	BullModule.forRootAsync({
+     41	  imports: [ConfigModule],
+     42	  inject: [queueConfig.KEY],
+     43	  useFactory: (cfg: ConfigType<typeof queueConfig>) => ({
+     44	    connection: { host: cfg.redisHost, port: cfg.redisPort }, // host = Compose service name "redis"
+     45	  }),
+     46	});
+     47	```
+     48	
+     49	Follow the phase-01 convention: a `registerAs('queue', …)` factory val … (+13095 chars)
+● Preflight gates passed (validation clean, no UI scope); now reading the codebase layout and Tech Specs templates before writing the phase 03 plan.
+● Bash(ls; cat docker-compose*.yml 2>/dev/null | head -120; ls nestjs-project; cat nestjs-project/package.json; find nestjs-project/src nestjs-project/test -type f | grep -v node_modules | sort)
+  ⎿  CLAUDE.md
+     FC Tube sem padrão.fig
+     FC Tube.fig
+     README.md
+     _claude-sessions
+     docs
+     mcp.example.py
+     nestjs-project
+     next-frontend
+     scripts
+     skills-lock.json
+     whiteboard.svg
+     (eval):1: no matches found: docker-compose*.yml
+     CLAUDE.md
+     Dockerfile.dev
+     README.md
+     api.http
+     compose.yaml
+     dist
+     eslint.config.mjs
+     nest-cli.json
+     node_modules
+     openapi.json
+     package-lock.json
+     package.json
+     src
+     test
+     tsconfig.build.json
+     tsconfig.json
+     {
+       "name": "nestjs-project",
+       "version": "0.0.1",
+       "description": "",
+       "author": "",
+       "private": true,
+       "license": "UNLICENSED",
+       "scripts": {
+         "build": "nest build",
+         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+         "start": "nest start",
+         "start:dev": "nest start --watch",
+         "start:debug": "nest start --debug --watch",
+         "start:prod": "node dist/main",
+         "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+         "test": "jest",
+         "test:watch": "jest --watch",
+         "test:cov": "jest --coverage",
+         "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+         "test:integration": "jest --runInBand --testRegex=\"\\.integration-spec\\.ts$\"",
+         "test:e2e": "jest --config ./test/jest-e2e.json",
+         "typeorm": "typeorm-ts-node-commonjs",
+         "migration:run": "npm run typeorm -- migration:run -d src/database/data-source.ts",
+         "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
+         "migration:generate": "npm run typeorm -- migration:generate -d src/database/data-source.ts",
+         "migration:create": "npm run typeorm -- migration:create",
+         "seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' src/database/seeds/seed.ts",
+         "openapi:export": "ts-node -r tsconfig-paths/register src/openapi-export.ts"
+       },
+       "dependencies": {
+         "@nestjs-modules/mailer": "^2.3.4",
+         "@nestjs/common": "^11.0.1",
+         "@nestjs/config": "^4.0.3",
+         "@nestjs/core": "^11.0.1",
+         "@nestjs/jwt": "^11.0.2",
+         "@nestjs/platform-express": "^1 … (+5411 chars)
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/nestjs-project && cat CLAUDE.md compose.yaml Dockerfile.dev; ls -a; cat .env.example 2>/dev/null)
+  ⎿  # CLAUDE.md
+     
+     ## Environment Startup Verification
+     
+     **Default behavior:** starting the environment means starting **only infrastructure services** (database, mail, etc.) — **never** start the NestJS application server unless the user explicitly asks to run/serve the project (e.g., "rode o projeto", "suba o servidor", "run the app").
+     
+     After starting infrastructure, always confirm the containers are up before proceeding:
+     
+     ```bash
+     docker compose ps   # all services must show status "running"
+     ```
+     
+     Then verify each infrastructure service is actually ready to accept connections — not just running:
+     
+     - **PostgreSQL:** `docker compose exec db pg_isready -U streamtube` — expect `accepting connections`
+     
+     Only start the NestJS dev server (`npm run start:dev`) when the user **explicitly** asks to run the application — never as part of "start the environment".
+     
+     ## Development Environment
+     
+     This project runs inside Docker. Always use the container for development:
+     
+     ```bash
+     # Start containers
+     docker compose up -d
+     
+     # Install dependencies (first time only)
+     docker compose exec nestjs-api npm install
+     
+     # Run the dev server (watch mode)
+     docker compose exec nestjs-api npm run start:dev
+     ```
+     
+     Services:
+     - `nestjs-api` — NestJS API, port `3000`
+     - `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
+     
+     All verification and teardown commands run on the **host machine**:
+     
+     ```bash
+     # Verify NestJS is running (expect 200 + "Hello World!")
+     curl http://localhost:3000
+     
+     # Verify PostgreSQL is ready (runs inside the db container)
+     docker compose exec db pg_isready -U streamtube
+     
+     # Check container logs
+     docker compose logs nestjs-api
+     docker compose logs db
+     
+     # Tear down the entire environment
+     docker compose down
+     ```
+     
+     ## Commands
+     
+     **Strict rule:** every `npm`, `npx`, `node`, `tsc`, and test command runs **inside the container**, never on the host. Running on the host causes env-var divergence (`DB_HOST` resolves to `localhost` instead of the Compose service), uses a different Node v … (+7486 chars)
+● Bash(cat src/app.module.ts src/main.ts src/config/env.validation.ts src/config/mail.config.ts src/common/exceptions/domain.exception.ts src/common/filters/domain-exception.filter.ts src/channels/entities/channel.entity.ts src/channels/channels.service.ts src/database/migrations.integration-spec.ts src/test/create-test-data-source.ts src/database/data-source.ts nest-cli.json test/jest-e2e.json)
+  ⎿  import { Module } from '@nestjs/common';
+     import { ConfigModule, ConfigType } from '@nestjs/config';
+     import { TypeOrmModule } from '@nestjs/typeorm';
+     import { AppController } from './app.controller';
+     import { AppService } from './app.service';
+     import { AuthModule } from './auth/auth.module';
+     import appConfig from './config/app.config';
+     import authConfig from './config/auth.config';
+     import databaseConfig from './config/database.config';
+     import mailConfig from './config/mail.config';
+     import swaggerConfig from './config/swagger.config';
+     import { envValidationSchema } from './config/env.validation';
+     
+     @Module({
+       imports: [
+         ConfigModule.forRoot({
+           isGlobal: true,
+           load: [appConfig, authConfig, databaseConfig, mailConfig, swaggerConfig],
+           validationSchema: envValidationSchema,
+           validationOptions: { allowUnknown: true, abortEarly: false },
+         }),
+         TypeOrmModule.forRootAsync({
+           imports: [ConfigModule],
+           inject: [databaseConfig.KEY],
+           useFactory: (dbConfig: ConfigType<typeof databaseConfig>) => ({
+             type: 'postgres',
+             host: dbConfig.host,
+             port: dbConfig.port,
+             username: dbConfig.username,
+             password: dbConfig.password,
+             database: dbConfig.name,
+             autoLoadEntities: true,
+             synchronize: false,
+           }),
+         }),
+         AuthModule,
+       ],
+       controllers: [AppController],
+       providers: [AppService],
+     })
+     export class AppModule {}
+     import { NestFactory } from '@nestjs/core';
+     import { ConfigService } from '@nestjs/config';
+     import type { ConfigType } from '@nestjs/config';
+     import { ValidationPipe } from '@nestjs/common';
+     import { SwaggerModule } from '@nestjs/swagger';
+     import { AppModule } from './app.module';
+     import { DomainExceptionFilter } from './common/filters/domain-exception.filter';
+     import { ValidationExceptionFilter } from './common/filters/validation-exception.filter';
+     import swaggerConfig from './config/swagger.config';
+     import { buildSwaggerDocument } from './swagger/swagger-document';
+     im … (+11977 chars)
+● Bash(cat src/auth/auth.module.ts src/auth/guards/jwt-auth.guard.ts src/auth/decorators/current-user.decorator.ts src/auth/auth.types.ts src/channels/channels.module.ts src/users/users.module.ts src/swagger/swagger-document.ts src/openapi-export.ts src/common/openapi/api-error-envelope.dto.ts; sed -n 1,80p src/auth/auth.controller.ts; sed -n 1,80p test/auth.e2e-spec.ts)
+  ⎿  import { Module } from '@nestjs/common';
+     import type { ConfigType } from '@nestjs/config';
+     import type { StringValue } from 'ms';
+     import { JwtModule } from '@nestjs/jwt';
+     import { APP_GUARD } from '@nestjs/core';
+     import { TypeOrmModule } from '@nestjs/typeorm';
+     import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+     import authConfig from '../config/auth.config';
+     import { MailModule } from '../mail/mail.module';
+     import { UsersModule } from '../users/users.module';
+     import { AuthController } from './auth.controller';
+     import { AuthService } from './auth.service';
+     import { JwtAuthGuard } from './guards/jwt-auth.guard';
+     import { RefreshToken } from './entities/refresh-token.entity';
+     import { VerificationToken } from './entities/verification-token.entity';
+     
+     @Module({
+       imports: [
+         UsersModule,
+         MailModule,
+         JwtModule.registerAsync({
+           inject: [authConfig.KEY],
+           useFactory: (cfg: ConfigType<typeof authConfig>) => ({
+             secret: cfg.jwtSecret,
+             signOptions: { expiresIn: cfg.jwtAccessExpiration as StringValue },
+           }),
+         }),
+         TypeOrmModule.forFeature([RefreshToken, VerificationToken]),
+         ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
+       ],
+       controllers: [AuthController],
+       providers: [
+         AuthService,
+         { provide: APP_GUARD, useClass: JwtAuthGuard },
+         { provide: APP_GUARD, useClass: ThrottlerGuard },
+       ],
+       exports: [AuthService, JwtModule],
+     })
+     export class AuthModule {}
+     import {
+       CanActivate,
+       ExecutionContext,
+       Injectable,
+       UnauthorizedException,
+     } from '@nestjs/common';
+     import { Reflector } from '@nestjs/core';
+     import { JwtService } from '@nestjs/jwt';
+     import { BEARER_PREFIX } from '../auth.constants';
+     import { JwtPayload } from '../auth.types';
+     import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+     
+     @Injectable()
+     export class JwtAuthGuard implements CanActivate {
+       constructor(
+         private readonly jwtService: JwtService,
+         private readonly reflector: Reflector,
+       ) {}
+     
+       async canActivate(co … (+8752 chars)
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-build/templates/tech-specs && for f in data-model api-contracts auth-matrix error-catalog events-messages; do echo "=== $f"; cat $f.md; done)
+  ⎿  === data-model
+     # Tech Spec subsection — Data Model
+     
+     Applies when entities are new or modified. Each entity becomes a `#### {EntityName}` heading (fields, relations, indexes listed below).
+     
+     ````markdown
+     ### Data Model
+     
+     #### {EntityName}
+     
+     | Field | Type | Constraints |
+     |-------|------|-------------|
+     | id | uuid | PK, generated |
+     | email | varchar(255) | unique, not null |
+     | created_at | timestamptz | default now() |
+     
+     **Relations:** `User` has many `Channel` (one-to-many)
+     **Indexes:** unique on `email`
+     ````
+     === api-contracts
+     # Tech Spec subsection — API Contracts
+     
+     Applies when HTTP endpoints are exposed. Each endpoint becomes a `#### {METHOD} {/path} (SI-NN.X)` heading carrying the SI cross-ref, followed by the request/response/error skeleton below. Endpoints are separated by a horizontal rule (`---`).
+     
+     `### API Contracts` may carry a **backend tier** (Scope-driven, per `phase-a.md` § A2) and/or a **BFF tier** (join-driven, per § A2's "`### API Contracts` — BFF tier" rule). Both tiers share the **same per-endpoint skeleton** of bold field labels: `**Request headers:**`, `**Request body:**`, `**Request query parameters:**`, `**Response {code}:**`, `**Error responses:**`. The shared-skeleton guarantee is **prefix-stable, not byte-exact**: the BFF tier **qualifies its response/error labels** as `**Response {code} (FE-facing):**` and `**Error responses (FE-facing):**` (the `(FE-facing)` qualifier flags that the shape is the BFF projection, not the upstream shape). Consumers — Phase B (B4 — "controller/route SIs reference API Contracts request/response shapes verbatim") and the `### UI ↔ API Traceability Matrix` — therefore anchor on the **label prefixes** (`**Request headers:`, `**Request body:`, `**Request query parameters:`, `**Response `, `**Error responses`), which match both tiers, **not** on exact strings. The BFF tier additionally layers two BFF-only fields on top of that skeleton — `**forwards-to:**` and `**Set-Cookie / session side-effect:**` — and tags every line … (+10367 chars)
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube && grep -n '/videos\|jobId\|video-processing\|reconcile' docs/decisions/technical-decisions-phase-03-videos.md | head -60; echo ----; grep -n '^##\|^###' docs/phases/phase-02-auth/phase-02-auth.md | head -60)
+  ⎿  34:- **Pros:** First-party NestJS module with DI-friendly producers and consumers. Built-in `attempts` + exponential `backoff`, `jobId` deduplication, `UnrecoverableError` for permanent failures, and lock renewal with stalled-job recovery. Stalled-job recovery fits long FFmpeg jobs whose worker may die mid-run. Repeatable jobs can drive the TD-13 reconciliation sweep without another lib.
+     202:### Option C: Owner-scoped prefixes (`channels/{channelId}/videos/{videoId}/...`)
+     225:- `POST /videos` creates the draft row and calls `CreateMultipartUpload`. It returns `videoId`, `uploadId`, the part size and the part count. The client requests presigned `UploadPart` URLs in batches and `PUT`s each part directly to storage. The client resumes by asking the API for the parts already stored (`ListParts`). The client calls a completion endpoint at the end (see TD-08). Typical parameters are 64 MiB parts (≈160 parts for 10 GiB) and short URL TTLs.
+     244:**Note:** The maximum size is 10 GiB (`10 * 1024^3` = 10,737,418,240 bytes). It is validated against the declared size at initiation (`POST /videos`) and checked again against the actual stored size at completion. The API fixes the part size at 64 MiB (67,108,864 bytes), with a smaller last part, so a 10 GiB upload has at most 160 parts.
+     259:- The client calls `POST /videos/{id}/upload/complete`. The API completes the multipart upload (with ETags from the client or via `ListParts`), `HEAD`s the object to validate size, updates the status, and enqueues the job (`jobId = videoId` for idempotency).
+     286:- The API rejects non-allowlisted MIME types/extensions at `POST /videos`. The worker confirms the real container/codecs with ffprobe and marks the video `failed` with a machine-readable reason if they are unsupported.
+     443:- **Pros:** Closes the dual-write gap and the missed-callback case. DB and storage converge. Stuck states are visible and bounded. Idempotent jobs (`jobId = videoId`) make re-enqueueing safe.
+     458:- **Stuck processing:* … (+2178 chars)
+● I've finished reading the context and the code; next I'm checking the phase 02 plan's style, then writing the phase 03 artifact.
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-02-auth/phase-02-auth.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-02-auth
+     4	sources_mtime:
+     5	  docs/project-plan.md: "2026-04-08T14:58:57-03:00"
+     6	  docs/decisions/technical-decisions-phase-02-auth.md: "2026-05-12T12:23:19-03:00"
+     7	  docs/phases/phase-01-configuracao-base/phase-01-configuracao-base.md: "2026-04-08T14:58:57-03:00"
+     8	---
+     9	
+     10	# Phase 02 — Cadastro, Login e Gerenciamento de Conta
+     11	
+     12	## Objective
+     13	
+     14	Deliver the complete authentication lifecycle — registration with automatic channel creation, email confirmation, login with JWT access/refresh token rotation, logout, and password recovery — establishing the identity and session foundation for all subsequent phases.
+     15	
+     16	---
+     17	
+     18	## Step Implementations
+     19	
+     20	### SI-02.1 — Dependencies, Configuration Namespaces, and Docker Compose
+     21	
+     22	**Description:** Install all Phase 02 production dependencies, create `auth` and `mail` config namespaces following the `registerAs` pattern from Phase 01, extend the Joi validation schema, and add the Mailpit SMTP service to Docker Compose.
+     23	
+     24	**Technical actions:**
+     25	
+     26	- Install production dependencies in nestjs-project: `argon2@^0.41.x`, `@nestjs/jwt@^11.0.0`, `@nestjs-modules/mailer@^2.x`, `handlebars@^4.x`, `@nestjs/throttler@^6.x`, `class-validator@^0.14.x`, `class-transformer@^0.5.x`
+     27	- Create `src/config/auth.config.ts` — `registerAs('auth', ...)` reading `JWT_SECRET` (string, required — used for access tokens), `JWT_REFRESH_SECRET` (string, required — separate secret for refresh tokens), `JWT_ACCESS_EXPIRATION` (string, default `'15m'`), `JWT_REFRESH_EXPIRATION` (string, default `'7d'`), `CONFIRMATION_TOKEN_EXPIRATION_HOURS` (number, default `1`), `PASSWORD_RESET_TOKEN_EXPIRATION_HOURS` (number, default `1`)
+     28	- Create `src/config/mail.config.ts` — `registerAs('mail', ...)` reading `MAIL_HOST` (string, default `'mailpit'`), `MAIL_PORT` (number, default `1025`), `MAIL_FROM` (string, default `'"StreamTube" <noreply@streamtube.com>'`)
+     29	- Update `src/config/env.validation.ts … (+3451 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-02-auth/phase-02-auth.md)
+  ⎿  740	| email | Must be a valid email format | email must be an email |
+     741	| password / new_password | Min 8 characters | password must be longer than or equal to 8 characters |
+     742	| password / new_password | Max 128 characters | password must be shorter than or equal to 128 characters |
+     743	
+     744	---
+     745	
+     746	### Authorization Matrix
+     747	
+     748	| Endpoint | Public | Authenticated | Notes |
+     749	|----------|--------|---------------|-------|
+     750	| POST /auth/register | ✓ | | |
+     751	| GET /auth/confirm-email | ✓ | | Token in query string (corrected in SI-02.17) |
+     752	| POST /auth/resend-confirmation | ✓ | | |
+     753	| POST /auth/login | ✓ | | |
+     754	| POST /auth/refresh | ✓ | | Uses refresh token, not access token |
+     755	| POST /auth/logout | | ✓ | Requires valid access token |
+     756	| POST /auth/forgot-password | ✓ | | |
+     757	| POST /auth/reset-password | ✓ | | Uses opaque token from email |
+     758	
+     759	---
+     760	
+     761	### Error Catalog
+     762	
+     763	**Error response format:** (applies to all nestjs-project HTTP endpoints from this phase onward)
+     764	```
+     765	{ statusCode: number, error: string, message: string }
+     766	```
+     767	The `error` field carries the domain error code from the catalog (e.g., `"EMAIL_ALREADY_EXISTS"`). For validation errors, `error` is `"VALIDATION_ERROR"` and `message` is an array of field-level error strings.
+     768	
+     769	| Code | HTTP | Message | Trigger |
+     770	|------|------|---------|---------|
+     771	| EMAIL_ALREADY_EXISTS | 409 | Email is already registered | POST /auth/register with an email that exists in users table |
+     772	| INVALID_CREDENTIALS | 401 | Invalid email or password | POST /auth/login with unknown email OR wrong password (same code for both — do not reveal which) |
+     773	| EMAIL_NOT_CONFIRMED | 403 | Email not confirmed | POST /auth/login when user's `is_confirmed = false` |
+     774	| INVALID_TOKEN | 401 | Invalid or already used token | GET /auth/confirm-email, POST /auth/reset-password, or POST /auth/refresh with a token not found in DB or already consumed |
+     775	| … (+3197 chars)
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/testing-guide-nestjs-project && ls -R; wc -l artifacts/future-types.md references/external-systems.md; cat references/external-systems.md | head -150)
+  ⎿  SKILL.md
+     artifacts
+     references
+     
+     ./artifacts:
+     controllers.md
+     dtos.md
+     entities.md
+     filters.md
+     future-types.md
+     guards.md
+     interceptors.md
+     middleware.md
+     modules.md
+     pipes.md
+     services.md
+     strategies.md
+     
+     ./references:
+     external-systems.md
+     file-conventions.md
+     gotchas.md
+     mock-health-rules.md
+          112 artifacts/future-types.md
+          178 references/external-systems.md
+          290 total
+     > Part of the `testing-guide-nestjs-project` skill (see `../SKILL.md`).
+     
+     # External System Strategies
+     
+     How each external system is handled in tests. These strategies were confirmed with the team.
+     
+     ---
+     
+     ## PostgreSQL — Real (Docker)
+     
+     **Strategy:** Real database via the Docker `db` service (already in `compose.yaml`).
+     
+     **Connection config for tests:**
+     ```typescript
+     {
+       type: 'postgres',
+       host: process.env.DB_HOST ?? 'localhost',
+       port: Number(process.env.DB_PORT ?? 5432),
+       username: process.env.DB_USERNAME ?? 'streamtube',
+       password: process.env.DB_PASSWORD ?? 'streamtube',
+       database: process.env.DB_DATABASE ?? 'streamtube',
+       synchronize: true, // auto-create tables in test setup
+     }
+     ```
+     
+     **Test isolation:**
+     - Use `dataSource.query('DELETE FROM "table_name"')` to clean tables between tests
+     - Do NOT use `repository.delete({})` — throws `Empty criteria(s) are not allowed`
+     - Alternative: `repository.clear()` (truncates the table)
+     - For complex foreign key chains, delete in reverse dependency order or use `TRUNCATE ... CASCADE`
+     - Use `beforeEach` for cleanup to ensure each test starts with a clean state
+     
+     **Entity setup:**
+     - Use `synchronize: true` in test DataSource to auto-create tables from entities
+     - For integration tests, import only the entities needed by the test — not all entities
+     - For E2E tests, import `AppModule` which includes all entities via their domain modules
+     
+     ---
+     
+     ## Object Storage — Local Filesystem
+     
+     **Strategy:** Local filesystem storage in development and tests. S3 in production.
+     
+     **Approach:**
+     - The storage layer should use an abstraction (e.g., `StorageService` interface) that allows  … (+2854 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/testing-guide-nestjs-project/artifacts/future-types.md)
+  ⎿  1	> Part of the `testing-guide-nestjs-project` skill (see `../SKILL.md`).
+     2	
+     3	# Future Types
+     4	
+     5	Proactive guidance for NestJS artifact types not yet present in the project but likely to be added based on the project plan (authentication, video processing, email, queues).
+     6	
+     7	---
+     8	
+     9	## Custom Decorators (`*.decorator.ts`)
+     10	
+     11	Custom decorators in NestJS are typically parameter decorators (e.g., `@CurrentUser()`) or composition decorators (combining multiple decorators into one).
+     12	
+     13	**What to test:**
+     14	- Parameter decorators that extract data from the request context
+     15	- Composition decorators that combine multiple decorators
+     16	
+     17	**Layer assignment:**
+     18	- **Parameter decorators** (e.g., `@CurrentUser()`): **E2E only** — test that the extracted value is correctly passed to the handler by testing the endpoint response
+     19	- **Composition decorators** (e.g., `@Public()` combining `@SetMetadata()` + others): **Skip** — these are declarative wrappers; test the behavior they enable via E2E
+     20	
+     21	**When to skip:** Most custom decorators are thin wrappers around `createParamDecorator()` or `applyDecorators()` — they have no testable logic.
+     22	
+     23	---
+     24	
+     25	## Event Listeners / Handlers
+     26	
+     27	If the project adopts NestJS's `@nestjs/event-emitter` for internal events (e.g., "user registered" triggers channel creation):
+     28	
+     29	**What to test:**
+     30	- Event handler correctly processes the event data
+     31	- Side effects (DB writes, emails, queue publishing) occur as expected
+     32	
+     33	**Layer assignment:**
+     34	- **Handlers with business logic**: Unit (mock dependencies) + Integration (real DB/external systems)
+     35	- **Handlers with only side effects**: Integration (real systems)
+     36	
+     37	**Setup pattern:**
+     38	```typescript
+     39	// Test the handler directly by calling its method, not by emitting the event
+     40	// Event emission is framework behavior; the handler's logic is your code
+     41	describe('UserRegisteredHandler', () => {
+     42	  it('should create a channel for the new use … (+2275 chars)
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/nestjs-project && cut -d= -f1 .env; cat .gitignore | head -30; sed -n 1,40p src/config/env.validation.integration-spec.ts; cat src/config/database.config.ts; sed -n 1,30p src/users/entities/user.entity.ts)
+  ⎿  # Application
+     NODE_ENV
+     PORT
+     
+     # Database (PostgreSQL)
+     DB_HOST
+     DB_PORT
+     DB_USERNAME
+     DB_PASSWORD
+     DB_NAME
+     
+     # JWT
+     JWT_SECRET
+     JWT_REFRESH_SECRET
+     JWT_ACCESS_EXPIRATION
+     JWT_REFRESH_EXPIRATION
+     CONFIRMATION_TOKEN_EXPIRATION_HOURS
+     PASSWORD_RESET_TOKEN_EXPIRATION_HOURS
+     
+     # Mail (Mailpit for local development)
+     MAIL_HOST
+     MAIL_PORT
+     MAIL_FROM
+     # compiled output
+     /dist
+     /node_modules
+     /build
+     
+     # Logs
+     logs
+     *.log
+     npm-debug.log*
+     pnpm-debug.log*
+     yarn-debug.log*
+     yarn-error.log*
+     lerna-debug.log*
+     
+     # OS
+     .DS_Store
+     
+     # Tests
+     /coverage
+     /.nyc_output
+     
+     # IDEs and editors
+     /.idea
+     .project
+     .classpath
+     .c9/
+     *.launch
+     .settings/
+     *.sublime-workspace
+     
+     import { envValidationSchema } from './env.validation';
+     
+     const requiredEnv = {
+       DB_USERNAME: 'user',
+       DB_PASSWORD: 'pass',
+       DB_NAME: 'db',
+       JWT_SECRET: 'secret',
+       JWT_REFRESH_SECRET: 'refresh-secret',
+     };
+     
+     const validate = (env: Record<string, string>) =>
+       envValidationSchema.validate(
+         { ...requiredEnv, ...env },
+         { allowUnknown: true, abortEarly: false },
+       );
+     
+     describe('envValidationSchema — SWAGGER_ENABLED', () => {
+       it('should reject SWAGGER_ENABLED with an invalid value', () => {
+         const { error } = validate({ SWAGGER_ENABLED: 'invalid' });
+         expect(error).toBeDefined();
+         expect(error!.message).toContain('SWAGGER_ENABLED');
+       });
+     
+       it('should accept SWAGGER_ENABLED=true', () => {
+         const { error } = validate({ SWAGGER_ENABLED: 'true' });
+         expect(error).toBeUndefined();
+       });
+     
+       it('should accept SWAGGER_ENABLED=false', () => {
+         const { error } = validate({ SWAGGER_ENABLED: 'false' });
+         expect(error).toBeUndefined();
+       });
+     
+       it('should apply default false when SWAGGER_ENABLED is not set', () => {
+         const { value, error } = validate({});
+         expect(error).toBeUndefined();
+         expect(value.SWAGGER_ENABLED).toBe('false');
+       });
+     });
+     import { registerAs } from '@nestjs/config';
+     
+     export default registerAs('database', () => ({
+       host: process.env.DB_HOST || 'localhost',
+       port: parseInt(process.env.DB_PORT || '5432', 10),
+       username:  … (+709 chars)
+● Bash(head -20 src/metadata.ts; grep -rn "metadata" --include=*.ts --include=*.json --include=*.md . 2>/dev/null | grep -v node_modules | grep -v "^./dist" | grep -iv "reflect-metadata\|emitDecorator" | head -15; sed -n 1,60p src/openapi-export.integration-spec.ts; sed -n 1,40p test/swagger.e2e-spec.ts)
+  ⎿  // Stub for @nestjs/swagger CLI plugin metadata.
+     // When using the TypeScript AST transformer (tsc path), the plugin injects
+     // __OPENAPI_METADATA_FACTORY__ methods directly into compiled DTO classes —
+     // no separate file is generated. This stub satisfies the import in main.ts.
+     // Replace with the output of PluginMetadataGenerator when migrating to SWC.
+     export default (): Promise<Record<string, unknown>> => Promise.resolve({});
+     (eval):1: no matches found: --include=*.ts
+     import { readFileSync } from 'node:fs';
+     import { tmpdir } from 'node:os';
+     import { join } from 'node:path';
+     import { exportSpec } from './openapi-export';
+     
+     describe('exportSpec (integration)', () => {
+       let outputPath: string;
+       let document: Record<string, unknown>;
+     
+       beforeAll(async () => {
+         outputPath = join(tmpdir(), `openapi-test-${Date.now()}.json`);
+         await exportSpec(outputPath);
+         document = JSON.parse(readFileSync(outputPath, 'utf-8')) as Record<
+           string,
+           unknown
+         >;
+       }, 30_000);
+     
+       it('exports a valid OpenAPI 3.x document', () => {
+         expect(document.openapi).toMatch(/^3\./);
+       });
+     
+       it('sets info.title to "StreamTube API"', () => {
+         const info = document.info as Record<string, unknown>;
+         expect(info.title).toBe('StreamTube API');
+       });
+     
+       it('sets info.version to "1.0"', () => {
+         const info = document.info as Record<string, unknown>;
+         expect(info.version).toBe('1.0');
+       });
+     
+       it('includes access-token Bearer security scheme', () => {
+         const components = document.components as Record<string, unknown>;
+         const schemes = components.securitySchemes as Record<
+           string,
+           Record<string, unknown>
+         >;
+         expect(schemes['access-token']).toMatchObject({
+           type: 'http',
+           scheme: 'bearer',
+           bearerFormat: 'JWT',
+         });
+       });
+     
+       it('includes non-empty components.schemas from DTO inference', () => {
+         const components = document.components as Record<string, unknown>;
+         const schemas = components.schemas as Record<string, unknown> … (+1777 chars)
+● Writing the plan scaffold now, then the Technical Specifications sections one at a time.
+● Write(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md (1453 chars))
+  ⎿  File created successfully at: /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md (file state is current in your context — no need to Read it back)
+● Bash(cat src/database/migrations/1777579850478-CreateAuthTokens.ts | head -40)
+  ⎿  import { MigrationInterface, QueryRunner } from 'typeorm';
+     
+     export class CreateAuthTokens1777579850478 implements MigrationInterface {
+       name = 'CreateAuthTokens1777579850478';
+     
+       public async up(queryRunner: QueryRunner): Promise<void> {
+         await queryRunner.query(
+           `CREATE TYPE "public"."verification_tokens_type_enum" AS ENUM('email_confirmation', 'password_reset')`,
+         );
+         await queryRunner.query(
+           `CREATE TABLE "verification_tokens" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "token_hash" character varying NOT NULL, "type" "public"."verification_tokens_type_enum" NOT NULL, "user_id" uuid NOT NULL, "expires_at" TIMESTAMP NOT NULL, "used_at" TIMESTAMP, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_f2d4d7a2aa57ef199e61567db22" PRIMARY KEY ("id"))`,
+         );
+         await queryRunner.query(
+           `CREATE INDEX "IDX_19d8484a0754cd015ca11302a5" ON "verification_tokens" ("token_hash") `,
+         );
+         await queryRunner.query(
+           `CREATE TABLE "refresh_tokens" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "token_hash" character varying NOT NULL, "family" uuid NOT NULL, "user_id" uuid NOT NULL, "expires_at" TIMESTAMP NOT NULL, "revoked_at" TIMESTAMP, "created_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_7d8bee0204106019488c4c50ffa" PRIMARY KEY ("id"))`,
+         );
+         await queryRunner.query(
+           `CREATE INDEX "IDX_a7838d2ba25be1342091b6695f" ON "refresh_tokens" ("token_hash") `,
+         );
+         await queryRunner.query(
+           `CREATE INDEX "IDX_46561d7f0169611662bbc8f542" ON "refresh_tokens" ("family", "revoked_at") `,
+         );
+         await queryRunner.query(
+           `ALTER TABLE "verification_tokens" ADD CONSTRAINT "FK_31d2079dc4079b80517d31cf4f2" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+         );
+         await queryRunner.query(
+           `ALTER TABLE "refresh_tokens" ADD CONSTRAINT "FK_3ddc983c5f7bcf132fd8732c3f4" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+       … (+353 chars)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Phase A is complete. Now writing the 20 Step Implementations one at a time, starting with the infrastructure SI.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● SIs 03.1–03.7 are written (infra, config, DB module, storage, queue, entity, service). Checking their order, then moving on to the endpoint SIs.
+● Grep({"pattern": "^### SI-", "path": "/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md", "output_mode": "content"})
+  ⎿  22:### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
+     48:### SI-03.2 — Namespaces de configuração `storage` e `queue` e ambiente de teste isolado
+     79:### SI-03.3 — DatabaseModule e opções de ConfigModule compartilhadas entre API e worker
+     105:### SI-03.4 — StorageModule: clientes S3 interno/público, multipart e URLs pré-assinadas
+     137:### SI-03.5 — QueueModule e fila `video-processing` (contratos + producer)
+     165:### SI-03.6 — Entidade `Video` e migration `CreateVideos`
+     197:### SI-03.7 — VideosService: pré-cadastro com slug único, leitura do dono e transições condicionais
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Upload endpoint SIs (03.8–03.12) are written. Next come delivery endpoints, then the worker SIs.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Bash(sleep 0)
+  ⎿  (Bash completed with no output)
+● SIs through 03.18 (worker, reconciliation sweep, pipeline E2E) are written. Two left (OpenAPI and docs), then the Dependency Map and Deliverables.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Grep({"pattern": "^### SI-|^\\*\\*Dependencies:\\*\\*", "path": "/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md", "output_mode": "content"})
+  ⎿  22:### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
+     36:**Dependencies:** none
+     48:### SI-03.2 — Namespaces de configuração `storage` e `queue` e ambiente de teste isolado
+     67:**Dependencies:** SI-03.1 — variáveis de ambiente e serviços precisam existir.
+     79:### SI-03.3 — DatabaseModule e opções de ConfigModule compartilhadas entre API e worker
+     95:**Dependencies:** SI-03.2 — os namespaces `storage` e `queue` entram na lista compartilhada.
+     105:### SI-03.4 — StorageModule: clientes S3 interno/público, multipart e URLs pré-assinadas
+     124:**Dependencies:** SI-03.1 (MinIO + bucket), SI-03.2 (namespace `storage`).
+     137:### SI-03.5 — QueueModule e fila `video-processing` (contratos + producer)
+     154:**Dependencies:** SI-03.1 (Redis), SI-03.2 (namespace `queue`).
+     165:### SI-03.6 — Entidade `Video` e migration `CreateVideos`
+     184:**Dependencies:** none — depende apenas das tabelas `channels`/`users` de Phase 02.
+     197:### SI-03.7 — VideosService: pré-cadastro com slug único, leitura do dono e transições condicionais
+     219:**Dependencies:** SI-03.3 (`DatabaseModule`), SI-03.6 (entidade e migration).
+     232:### SI-03.8 — Endpoint POST /videos (início do upload + pré-cadastro do rascunho)
+     255:**Dependencies:** SI-03.4 (StorageService), SI-03.7 (VideosService, exceções, `ChannelsService.findByUserId`).
+     270:### SI-03.9 — Endpoint GET /videos/:id (leitura do dono)
+     285:**Dependencies:** SI-03.8 — `VideosController` e `VideoResponseDto` existem.
+     297:### SI-03.10 — Endpoint GET /videos/:id/upload (estado para retomada)
+     318:**Dependencies:** SI-03.8 — `VideoUploadsService` e o vídeo em `draft` com multipart aberto.
+     329:### SI-03.11 — Endpoint POST /videos/:id/upload/part-urls (URLs pré-assinadas de partes)
+     350:**Dependencies:** SI-03.8 — `VideoUploadsService` e o vídeo em `draft` com multipart aberto.
+     363:### SI-03.12 — Endpoint POST /videos/:id/upload/complete (conclusão + disparo do processamento)
+     385:**Dependencies:** SI-03.5 (producer), SI-03.11 (p … (+1481 chars)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Bash(cd /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube && grep -n '<!--' docs/phases/phase-03-videos/phase-03-videos.md; grep -c 'phase-a-complete' docs/phases/phase-02-auth-frontend/phase-02-auth-frontend.md; grep -n '^## \|^### [A-Z]' docs/phases/phase-03-videos/phase-03-videos.md | grep -v 'SI-'; wc -l docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  1000:<!-- phase-a-complete -->
+     0
+     14:## Objective
+     20:## Step Implementations
+     646:## Technical Specifications
+     648:### Data Model
+     712:### API Contracts
+     913:### Authorization Matrix
+     930:### Error Catalog
+     948:### Events/Messages
+     1002:## Dependency Map
+     1038:## Deliverables
+         1068 docs/phases/phase-03-videos/phase-03-videos.md
+● Dependency Map and Deliverables are written. Removing the leftover Phase A marker so the plan reads as a finished artifact.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● DONE. Wrote 20 SIs (SI-03.1, SI-03.2, SI-03.3, SI-03.4, SI-03.5, SI-03.6, SI-03.7, SI-03.8, SI-03.9, SI-03.10, SI-03.11, SI-03.12, SI-03.13, SI-03.14, SI-03.15, SI-03.16, SI-03.17, SI-03.18, SI-03.19, SI-03.20). Technical Specifications: Data Model, API Contracts, Authorization Matrix, Error Catalog, Events/Messages. Dependency Map + Deliverables written. Next: run /plan-test-specs phase-03-videos to write the test spec files for the six controller SIs (SI-03.8 to SI-03.13, each marked `**Test Specs:** _pending /plan-test-specs_`), then /implement phase-03-videos.
+
+The plan is at `docs/phases/phase-03-videos/phase-03-videos.md`. It is not committed.
+
+Decisions I made that no TD fixed:
+- **Bucket setup:** a one-shot `minio-init` Compose service using the pinned `pgsty/mc` image creates the private bucket. `nestjs-api` and `video-worker` wait for it to finish successfully before they start.
+- **Link expiry settings:** two env vars with the defaults you asked for, `S3_UPLOAD_PART_URL_TTL_SECONDS=3600` and `S3_DELIVERY_URL_TTL_SECONDS=14400`. Joi limits them to 60 seconds–7 days.
+- **Rate limit:** the existing `ThrottlerGuard` is registered as an app-wide guard (`APP_GUARD`), so its 10 requests/minute would also hit video routes. Uploading 160 parts in batches would fail with 429 errors. `VideosController` gets `@SkipThrottle()`, and SI-03.8 has a criterion that checks it.
+- **Test isolation:** Jest forces `QUEUE_PREFIX=streamtube-test` and `S3_PUBLIC_ENDPOINT=http://minio:9000`. This keeps the always-on dev `video-worker` from picking up test jobs. `cleanAllTables` now deletes `videos` first, because the new table references channels.
+- **Cleanup sweep:** it runs on its own queue, `video-reconciliation`, so it never waits behind long FFmpeg jobs. The scheduler id is `reconcile-videos` and it runs every 15 minutes.
+- **Worker dev command:** `start:worker:dev` uses `node --watch` with ts-node rather than a second `nest start --watch`. Two watch builds would both write to `dist/` and delete each other's output.
+
+Two things need checking when you implement:
+- **MinIO health check:** confirm which probe tool the pinned `pgsty/minio` image includes (`curl` or `mc ready local`).
+- **Library cache headings:** `library-refs.md` uses `##` headings, but the coverage step searches for `###`. All five libraries are in the cache, so I treated the check as passed.
+
+=== result: success turns=56 cost=$6.041332 duration=910s
