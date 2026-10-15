@@ -12,6 +12,10 @@ import { VerificationToken } from '../src/auth/entities/verification-token.entit
 import { DomainExceptionFilter } from '../src/common/filters/domain-exception.filter';
 import { ValidationExceptionFilter } from '../src/common/filters/validation-exception.filter';
 import { cleanAllTables } from '../src/test/create-test-data-source';
+import {
+  captureConfirmationToken,
+  registerConfirmAndLogin,
+} from './helpers/auth.helper';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
@@ -54,41 +58,6 @@ describe('Auth (e2e)', () => {
     await cleanAllTables(dataSource);
     throttlerStorage.storage.clear();
   });
-
-  async function captureConfirmationToken(
-    email: string,
-    password = 'password123',
-  ): Promise<string> {
-    const authService = app.get(AuthService);
-    const mailServiceInstance = (authService as any).mailService;
-    let capturedToken = '';
-    jest
-      .spyOn(mailServiceInstance, 'sendConfirmationEmail')
-      .mockImplementationOnce(async (_e: string, _n: string, t: string) => {
-        capturedToken = t;
-      });
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({ email, password });
-    return capturedToken;
-  }
-
-  async function registerConfirmAndLogin(
-    email: string,
-    password = 'password123',
-  ): Promise<{ access_token: string; refresh_token: string }> {
-    const token = await captureConfirmationToken(email, password);
-    await request(app.getHttpServer())
-      .get('/auth/confirm-email')
-      .query({ token });
-    const res = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password });
-    return {
-      access_token: res.body.access_token,
-      refresh_token: res.body.refresh_token,
-    };
-  }
 
   describe('POST /auth/register', () => {
     it('returns 201 with { id, email } on valid registration', async () => {
@@ -157,7 +126,10 @@ describe('Auth (e2e)', () => {
 
   describe('GET /auth/confirm-email', () => {
     it('returns 204 with a valid, unused, non-expired token', async () => {
-      const token = await captureConfirmationToken('toconfirm@example.com');
+      const token = await captureConfirmationToken(
+        app,
+        'toconfirm@example.com',
+      );
 
       await request(app.getHttpServer())
         .get('/auth/confirm-email')
@@ -166,7 +138,10 @@ describe('Auth (e2e)', () => {
     });
 
     it('returns 401 with INVALID_TOKEN on an already-used token', async () => {
-      const token = await captureConfirmationToken('usedtoken@example.com');
+      const token = await captureConfirmationToken(
+        app,
+        'usedtoken@example.com',
+      );
 
       await request(app.getHttpServer())
         .get('/auth/confirm-email')
@@ -182,7 +157,7 @@ describe('Auth (e2e)', () => {
     });
 
     it('returns 401 with TOKEN_EXPIRED on an expired token', async () => {
-      const token = await captureConfirmationToken('expired@example.com');
+      const token = await captureConfirmationToken(app, 'expired@example.com');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       await verificationTokenRepository.update(
         { token_hash: tokenHash },
@@ -227,6 +202,7 @@ describe('Auth (e2e)', () => {
 
     it('returns 204 for an already-confirmed email (no leak)', async () => {
       const token = await captureConfirmationToken(
+        app,
         'alreadyconfirmed@example.com',
       );
 
@@ -263,7 +239,10 @@ describe('Auth (e2e)', () => {
     });
 
     it('returns 200 on GET /auth/me with a valid access token', async () => {
-      const { access_token } = await registerConfirmAndLogin('me@example.com');
+      const { access_token } = await registerConfirmAndLogin(
+        app,
+        'me@example.com',
+      );
 
       const res = await request(app.getHttpServer())
         .get('/auth/me')
@@ -291,7 +270,7 @@ describe('Auth (e2e)', () => {
       email: string,
       password: string,
     ): Promise<void> {
-      const token = await captureConfirmationToken(email, password);
+      const token = await captureConfirmationToken(app, email, password);
       await request(app.getHttpServer())
         .get('/auth/confirm-email')
         .query({ token });
@@ -357,6 +336,7 @@ describe('Auth (e2e)', () => {
   describe('POST /auth/refresh', () => {
     it('returns 200 with new access_token and refresh_token on valid refresh token', async () => {
       const { refresh_token } = await registerConfirmAndLogin(
+        app,
         'refresh@example.com',
       );
 
@@ -381,6 +361,7 @@ describe('Auth (e2e)', () => {
 
     it('returns 401 with TOKEN_EXPIRED on an expired refresh token', async () => {
       const { refresh_token } = await registerConfirmAndLogin(
+        app,
         'refreshexp@example.com',
       );
       const tokenHash = crypto
@@ -401,8 +382,10 @@ describe('Auth (e2e)', () => {
     });
 
     it('returns 200 with valid access token when reuse is within grace period', async () => {
-      const { refresh_token: token1 } =
-        await registerConfirmAndLogin('grace2@example.com');
+      const { refresh_token: token1 } = await registerConfirmAndLogin(
+        app,
+        'grace2@example.com',
+      );
 
       await request(app.getHttpServer())
         .post('/auth/refresh')
@@ -431,8 +414,10 @@ describe('Auth (e2e)', () => {
     });
 
     it('returns 401 with TOKEN_REUSE_DETECTED when reuse is beyond grace period', async () => {
-      const { refresh_token: token1 } =
-        await registerConfirmAndLogin('reuse2@example.com');
+      const { refresh_token: token1 } = await registerConfirmAndLogin(
+        app,
+        'reuse2@example.com',
+      );
 
       await request(app.getHttpServer())
         .post('/auth/refresh')
@@ -476,8 +461,10 @@ describe('Auth (e2e)', () => {
 
   describe('POST /auth/logout', () => {
     it('returns 204 with a valid access token', async () => {
-      const { access_token } =
-        await registerConfirmAndLogin('logout@example.com');
+      const { access_token } = await registerConfirmAndLogin(
+        app,
+        'logout@example.com',
+      );
 
       await request(app.getHttpServer())
         .post('/auth/logout')
@@ -491,6 +478,7 @@ describe('Auth (e2e)', () => {
 
     it('revokes all refresh tokens so subsequent refresh calls return 401', async () => {
       const { access_token, refresh_token } = await registerConfirmAndLogin(
+        app,
         'logoutrefresh@example.com',
       );
 
@@ -516,8 +504,9 @@ describe('Auth (e2e)', () => {
     let captured = '';
     jest
       .spyOn(mailServiceInstance, 'sendPasswordResetEmail')
-      .mockImplementationOnce(async (_e: string, _n: string, t: string) => {
+      .mockImplementationOnce((_e: string, _n: string, t: string) => {
         captured = t;
+        return Promise.resolve();
       });
     await request(app.getHttpServer())
       .post('/auth/forgot-password')
@@ -527,7 +516,7 @@ describe('Auth (e2e)', () => {
 
   describe('POST /auth/forgot-password', () => {
     it('returns 204 for a registered email', async () => {
-      await registerConfirmAndLogin('forgot@example.com');
+      await registerConfirmAndLogin(app, 'forgot@example.com');
 
       await request(app.getHttpServer())
         .post('/auth/forgot-password')
@@ -554,7 +543,7 @@ describe('Auth (e2e)', () => {
 
   describe('POST /auth/reset-password', () => {
     it('returns 204 with a valid token and updates the password', async () => {
-      await registerConfirmAndLogin('resetok@example.com', 'oldpassword');
+      await registerConfirmAndLogin(app, 'resetok@example.com', 'oldpassword');
       const token = await capturePasswordResetToken('resetok@example.com');
 
       await request(app.getHttpServer())
@@ -576,6 +565,7 @@ describe('Auth (e2e)', () => {
 
     it('revokes all refresh tokens after reset', async () => {
       const { refresh_token } = await registerConfirmAndLogin(
+        app,
         'resetrevoke@example.com',
         'oldpassword',
       );
@@ -605,7 +595,11 @@ describe('Auth (e2e)', () => {
     });
 
     it('returns 401 with INVALID_TOKEN on a reused token', async () => {
-      await registerConfirmAndLogin('resetreuse@example.com', 'oldpassword');
+      await registerConfirmAndLogin(
+        app,
+        'resetreuse@example.com',
+        'oldpassword',
+      );
       const token = await capturePasswordResetToken('resetreuse@example.com');
 
       await request(app.getHttpServer())
@@ -622,7 +616,7 @@ describe('Auth (e2e)', () => {
     });
 
     it('returns 401 with TOKEN_EXPIRED on an expired token', async () => {
-      await registerConfirmAndLogin('resetexp@example.com', 'oldpassword');
+      await registerConfirmAndLogin(app, 'resetexp@example.com', 'oldpassword');
       const token = await capturePasswordResetToken('resetexp@example.com');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       await verificationTokenRepository.update(

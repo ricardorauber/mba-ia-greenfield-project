@@ -63,10 +63,10 @@ npm run start:dev                        # Dev server with hot-reload
 npm run build                            # Compile to dist/
 npm run start:prod                       # Run compiled build
 
-npm test                                 # Unit tests
+npm test                                 # Unit + integration tests (script already passes --runInBand)
 npm run test:watch                       # Unit tests in watch mode
-npm run test:cov                         # Coverage report
-npm run test:e2e                         # End-to-end tests (always with --runInBand)
+npm run test:cov                         # Coverage report (--runInBand)
+npm run test:e2e                         # End-to-end tests (--runInBand)
 
 npx tsc --noEmit                         # Type-check (required before declaring a task done)
 npm run lint                             # ESLint with auto-fix
@@ -84,11 +84,11 @@ curl http://localhost:3000
 
 ### Test execution
 
-Integration and e2e suites share a single test database. They **must** be run with `--runInBand`:
+Integration and e2e suites share a single test database. They **must** be run with `--runInBand`, which the `test`, `test:cov` and `test:e2e` scripts already pass:
 
 ```bash
-docker compose exec nestjs-api npm test -- --runInBand
-docker compose exec nestjs-api npm run test:e2e   # already configured
+docker compose exec nestjs-api npm test
+docker compose exec nestjs-api npm run test:e2e
 ```
 
 Parallel execution causes FK violations, deadlocks, and cross-suite contamination because suites truncate or seed shared tables concurrently.
@@ -159,3 +159,85 @@ NestJS with standard module structure. Source lives in `src/`, compiled output i
 ## REST Conventions
 
 This is a RESTful API. All endpoints must follow standard REST conventions — correct HTTP methods, proper status codes, plural resource nouns, and consistent URL structure. Details are enforced via rules on controller files.
+
+## Videos
+
+Upload, processing and delivery of videos (phase 03). Plan and decisions: `../docs/phases/phase-03-videos/phase-03-videos.md`.
+
+### Services
+
+| Service | Port(s) | Role |
+|---|---|---|
+| `minio` | `9000` (S3 API), `9001` (console) | Object storage, image `pgsty/minio`, data in the `minio-data` volume |
+| `minio-init` | — | One-shot: creates the private bucket `S3_BUCKET` and exits `0` (idempotent on every `up`) |
+| `redis` | `6379` | BullMQ broker, started with `--maxmemory-policy noeviction` |
+| `video-worker` | none | Same image and code as `nestjs-api`, entrypoint `src/worker.ts` (`npm run start:worker:dev`), no HTTP server |
+
+Besides `db` and `mailpit`, `nestjs-api` also waits for `redis` (healthy) and `minio-init` (completed successfully); `video-worker` waits for `db`, `redis` and `minio-init`.
+
+Readiness checks (host machine):
+
+```bash
+docker compose ps -a                         # minio and redis "healthy", minio-init "Exited (0)", video-worker "Up"
+docker compose exec redis redis-cli ping     # PONG
+docker compose logs minio-init               # "Bucket created successfully `local/streamtube-videos`."
+docker compose logs video-worker             # "Video worker ready, consuming video-processing"
+```
+
+### Environment variables
+
+Defined in `.env` / `.env.example`, validated by `src/config/env.validation.ts`, read through the `storage` and `queue` namespaces (`src/config/storage.config.ts`, `src/config/queue.config.ts`).
+
+| Variable | Dev value | Notes |
+|---|---|---|
+| `S3_ENDPOINT` | `http://minio:9000` | Server-side client (API and worker). Unset on AWS S3 |
+| `S3_PUBLIC_ENDPOINT` | `http://localhost:9000` | Host signed into browser-facing presigned URLs; defaults to `S3_ENDPOINT` |
+| `S3_REGION` | `us-east-1` | |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | `streamtube` / `streamtube-secret` | Required; also MinIO's root credentials (secret ≥ 8 chars) |
+| `S3_BUCKET` | `streamtube-videos` | Private bucket |
+| `S3_FORCE_PATH_STYLE` | `true` | Required by MinIO |
+| `S3_UPLOAD_PART_URL_TTL_SECONDS` | `3600` | Part URL lifetime (60..604800) |
+| `S3_DELIVERY_URL_TTL_SECONDS` | `14400` | Stream/download/thumbnail URL lifetime (60..604800) |
+| `REDIS_HOST` / `REDIS_PORT` | `redis` / `6379` | |
+| `QUEUE_PREFIX` | `streamtube` | Redis key prefix of every queue |
+
+### HTTP flow
+
+All routes require `Authorization: Bearer <access_token>` and only serve the owner (another user's video is a `404 VIDEO_NOT_FOUND`).
+
+1. `POST /videos` `{ file_name, mime_type, size, title? }` → `201`, video in `draft` plus `upload: { part_size: 67108864, part_count }`. Only `video/mp4` (`.mp4`) and `video/webm` (`.webm`), up to 10 GiB.
+2. `POST /videos/:id/upload/part-urls` `{ part_numbers: [...] }` (1..100 per call) → `{ expires_in, parts: [{ part_number, url }] }`.
+3. The client `PUT`s each 64 MiB part straight to its `url` (storage, not the API) and keeps nothing else.
+4. Resume after an interruption: `GET /videos/:id/upload` → `uploaded_parts`; request URLs only for the missing parts.
+5. `POST /videos/:id/upload/complete` → `200`, status `processing`, job `process-video` queued (idempotent on `processing`/`ready`).
+6. Poll `GET /videos/:id` until `ready` (or `failed` with `failure_reason`).
+7. `GET /videos/:id/stream`, `/download`, `/thumbnail` → `302` to a presigned URL (`Cache-Control: private, no-store`); storage serves `Range`/`206`.
+
+Storage layout: `videos/{videoId}/original` and `videos/{videoId}/thumbnail.jpg` (`src/videos/video-storage-keys.ts`).
+
+### Worker
+
+- Queues (`src/video-processing/video-processing.queue.ts`): `video-processing` (job `process-video`, `jobId` = video id, 5 attempts with exponential backoff) and `video-reconciliation` (job scheduler `reconcile-videos` every 15 min: fails drafts older than 24 h as `upload_abandoned`, re-enqueues videos `processing` for more than 1 h).
+- Consumers are registered only in `src/worker.module.ts` (`VideoProcessingWorkerModule`); the API only produces jobs.
+- Commands (inside the container): `npm run start:worker` runs `dist/worker` (after `npm run build`); `npm run start:worker:dev` runs `src/worker.ts` with `node --watch` and is what the `video-worker` service uses. The script starts with `exec` so `docker compose stop video-worker` delivers SIGTERM to Node and the worker shuts down gracefully (logs `Video worker shut down (SIGTERM)`).
+- FFmpeg/ffprobe come from the shared `Dockerfile.dev` (Debian 12 package).
+
+### OpenAPI export
+
+`npm run openapi:export` runs `nest build && node dist/openapi-export.js`: the `@nestjs/swagger` CLI plugin only runs in `nest build`, and without it request DTOs export with no properties. It rewrites `dist/`, so do not run it while `npm run start:dev` is running.
+
+### Testing videos
+
+- Tests use real MinIO, Redis, PostgreSQL and FFmpeg — no storage, queue or media mocks.
+- `src/test/setup-test-env.ts` (first Jest `setupFiles` entry in both configs) sets `QUEUE_PREFIX=streamtube-test` and `S3_PUBLIC_ENDPOINT=http://minio:9000` before `dotenv/config`, so tests never touch the dev queues (the dev `video-worker` keeps running) and presigned URLs are reachable from inside the container.
+- Suites that start their own BullMQ workers or schedulers set a unique prefix per file (`${QUEUE_PREFIX}-<name>-<uuid>`) and call `queue.obliterate({ force: true })` in `afterAll`.
+- Storage cleanup: `StorageService.deletePrefix(videoPrefix(id))` for every video created, plus `abortMultipartUpload` for uploads left open.
+- Media fixtures are generated at test time by `createVideoFixtures()` in `src/test/video-fixtures.ts`; call the returned `cleanup()` in `afterAll`.
+- E2E suites authenticate with `createAuthenticatedUser(app)` from `test/helpers/auth.helper.ts`; it makes 3 auth requests, so clear `ThrottlerStorage` in `beforeEach`.
+- `@nestjs/bullmq` and `@nestjs/bull-shared` are ESM-only; both Jest configs transform them through ts-jest (`transformIgnorePatterns`) — keep that if you add Jest configs.
+
+### Production notes
+
+- AWS S3: leave `S3_ENDPOINT` unset (the SDK resolves the regional endpoint) and set `S3_PUBLIC_ENDPOINT` only if browsers must reach a different host.
+- Bucket CORS must allow `PUT` and `GET` from the frontend origin and expose the `ETag` header (so the browser can confirm each part `PUT`; the API itself reads the ETags through `ListParts`). Locally `MINIO_API_CORS_ALLOW_ORIGIN: "*"` in `compose.yaml` covers this for dev only.
+- Add a lifecycle rule `AbortIncompleteMultipartUpload` as defense in depth; the `reconcile-videos` sweep is the primary cleanup of abandoned uploads.
