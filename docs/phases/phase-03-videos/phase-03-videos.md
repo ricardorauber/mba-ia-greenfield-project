@@ -232,7 +232,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 ### SI-03.8 — Endpoint POST /videos (início do upload + pré-cadastro do rascunho)
 
 **Route:** POST /videos
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-create.plan.md`
 **Authorization:** Authenticated (o vídeo é criado no canal do usuário — ver `### Authorization Matrix`)
 
 **Description:** Ao iniciar o upload, validar formato e tamanho declarados, abrir o multipart upload direto no storage e pré-cadastrar automaticamente o vídeo como rascunho, devolvendo o plano de partes — o primeiro passo do upload de até 10GB que nunca passa pela API.
@@ -244,6 +244,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 3. Criar `src/videos/videos.controller.ts` — `@ApiTags('videos')`, `@ApiBearerAuth('access-token')`, `@SkipThrottle()` (o throttling de `phase-02-auth/TD-08` é escopado ao auth), `@Controller('videos')`; `@Post()` `create(@CurrentUser() user: JwtPayload, @Body() dto: CreateVideoDto)` → `201`.
 4. Decorators OpenAPI do `create`: `@ApiOperation`, `@ApiResponse` 201 (`type: CreateVideoResponseDto`), 400 (`VALIDATION_ERROR`, `UNSUPPORTED_VIDEO_FORMAT`, `VIDEO_TOO_LARGE`), 401 e 404 (`CHANNEL_NOT_FOUND`) com `$ref: getSchemaPath(ApiErrorEnvelope)` (per `openapi-docs-nestjs/TD-01`).
 5. Registrar em `VideosModule`: importar `StorageModule`, prover `VideoUploadsService` e declarar `VideosController`.
+6. Extrair o fluxo registrar → confirmar → login de `test/auth.e2e-spec.ts` para `test/helpers/auth.helper.ts` (`createAuthenticatedUser(app)` devolvendo `access_token`), sem mudar o comportamento da suíte de auth — os specs E2E de SI-03.8 a SI-03.13 dependem dele.
 
 **Tests:**
 
@@ -270,7 +271,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 ### SI-03.9 — Endpoint GET /videos/:id (leitura do dono)
 
 **Route:** GET /videos/:id
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-get.plan.md`
 **Authorization:** Owner (não dono → 404 `VIDEO_NOT_FOUND`)
 
 **Description:** Expor a leitura mínima de um vídeo pelo dono, em qualquer status, para acompanhar o processamento e obter o `slug` que forma a URL única do vídeo.
@@ -297,7 +298,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 ### SI-03.10 — Endpoint GET /videos/:id/upload (estado para retomada)
 
 **Route:** GET /videos/:id/upload
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload-status.plan.md`
 **Authorization:** Owner, somente com o vídeo em `draft`
 
 **Description:** Permitir que o cliente retome um upload interrompido descobrindo quais partes já estão no storage, sem guardar estado próprio — a retomada nativa do multipart S3.
@@ -329,7 +330,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 ### SI-03.11 — Endpoint POST /videos/:id/upload/part-urls (URLs pré-assinadas de partes)
 
 **Route:** POST /videos/:id/upload/part-urls
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload-part-urls.plan.md`
 **Authorization:** Owner, somente com o vídeo em `draft`
 
 **Description:** Entregar ao cliente, em lotes, as URLs pré-assinadas para enviar cada parte de 64 MiB direto ao storage — o plano de dados do upload de 10GB não passa pela API nem pelo BFF, então não afeta a performance do sistema.
@@ -363,7 +364,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 ### SI-03.12 — Endpoint POST /videos/:id/upload/complete (conclusão + disparo do processamento)
 
 **Route:** POST /videos/:id/upload/complete
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload-complete.plan.md`
 **Authorization:** Owner; `draft` conclui, `processing`/`ready` é replay idempotente, `failed` → 409
 
 **Description:** Concluir o multipart upload no storage, validar que o arquivo montado tem o tamanho declarado, mover o vídeo para `processing` e enfileirar o processamento automático — o gatilho único entre upload e worker.
@@ -399,7 +400,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 ### SI-03.13 — Endpoints de entrega: streaming, download e thumbnail
 
 **Route:** GET /videos/:id/stream, GET /videos/:id/download, GET /videos/:id/thumbnail
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-delivery.plan.md`
 **Authorization:** Owner, somente com o vídeo em `ready`
 
 **Description:** Entregar reprodução via streaming (sem download completo — `Range`/`206` nativo do storage) e download do vídeo pelo dono, além do acesso à thumbnail, redirecionando para URLs pré-assinadas de curta duração sem consumir banda da API.
@@ -567,7 +568,7 @@ Entregar o backend de upload e processamento de vídeos do StreamTube: serviço 
 
 **Technical actions:**
 
-1. Extrair o fluxo registrar → confirmar → login de `test/auth.e2e-spec.ts` para `test/helpers/auth.helper.ts` (`createAuthenticatedUser(app)` devolvendo `access_token`) e reutilizá-lo no novo arquivo, sem mudar o comportamento da suíte de auth.
+1. Reutilizar `test/helpers/auth.helper.ts` (`createAuthenticatedUser(app)`, extraído em SI-03.8) no novo arquivo.
 2. Criar `test/videos-pipeline.e2e-spec.ts` — sobe o `AppModule` HTTP (mesmos pipes/filtros de `main.ts`) e, no mesmo processo, `NestFactory.createApplicationContext(WorkerModule)` com o prefixo de teste `streamtube-test`; `obliterate` das filas no `beforeAll`/`afterAll`; timeout de 180 s por teste.
 3. Cenário feliz: fixture MP4 H.264/AAC maior que 64 MiB (ex.: `testsrc2` 1280x720 com `-qp 0` por alguns segundos) → `POST /videos` (`part_count: 2`) → `POST .../part-urls` `[1, 2]` → `PUT` das duas fatias com `fetch` → `POST .../complete` → polling de `GET /videos/:id` até `ready` → `GET .../stream` (302) + `GET` no `Location` com `Range` (206) → `GET .../download` (302, `Content-Disposition: attachment`) → `GET .../thumbnail` (302, JPEG).
 4. Cenário de retomada: envia só a parte 1, descarta o estado do cliente, `GET /videos/:id/upload` lista a parte 1, pede URL só da parte 2, envia, conclui → `ready`. Cenário de falha: MP4 com vídeo MPEG-4 Part 2 declarado `video/mp4` → `failed` com `unsupported_format` e `GET .../stream` → `409 VIDEO_NOT_READY`.
