@@ -1,0 +1,2392 @@
+=== session 7ef6f0c4-e06e-490c-b969-a8aea111d9ed model=claude-opus-5-5 cwd=/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube
+● Bash(ls docs/phases/ docs/decisions/ docs/rules/plan-validate/ 2>&1; ls docs/phases/*/ ; wc -l .claude/skills/plan-pipeline/SKILL.md)
+  ⎿  ls: docs/rules/plan-validate/: No such file or directory
+     docs/decisions/:
+     technical-decisions-next-frontend-config-base.md
+     technical-decisions-next-frontend-msw-foundation.md
+     technical-decisions-next-frontend-openapi-typing.md
+     technical-decisions-openapi-docs-nestjs.md
+     technical-decisions-phase-01-configuracao-base.md
+     technical-decisions-phase-02-auth-frontend.md
+     technical-decisions-phase-02-auth.md
+     technical-decisions-phase-03-videos.md
+     
+     docs/phases/:
+     phase-01-configuracao-base
+     phase-02-auth
+     phase-02-auth-frontend
+     phase-03-videos
+     docs/phases/phase-01-configuracao-base/:
+     context.md
+     phase-01-configuracao-base.md
+     progress.md
+     validation.md
+     
+     docs/phases/phase-02-auth-frontend/:
+     context.md
+     frontend-drift-report.md
+     library-refs.md
+     phase-02-auth-frontend.md
+     progress.md
+     validation.md
+     
+     docs/phases/phase-02-auth/:
+     context.md
+     phase-02-auth.md
+     progress.md
+     validation.md
+     
+     docs/phases/phase-03-videos/:
+     context.md
+          356 .claude/skills/plan-pipeline/SKILL.md
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-pipeline/SKILL.md)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	sources_mtime:
+     5	  docs/project-plan.md: "2026-10-15T13:27:03-03:00"
+     6	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T13:56:13-03:00"
+     7	  docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-15T13:28:45-03:00"
+     8	  docs/phases/phase-01-configuracao-base/context.md: "2026-10-15T13:28:45-03:00"
+     9	  docs/phases/phase-02-auth/context.md: "2026-10-15T13:28:45-03:00"
+     10	  docs/phases/phase-02-auth-frontend/context.md: "2026-10-15T13:28:45-03:00"
+     11	  .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-10-15T13:27:02-03:00"
+     12	---
+     13	
+     14	# phase-03-videos — Context
+     15	
+     16	## Scope
+     17	
+     18	**Phase name:** Fase 03 — Upload e Processamento de Vídeos
+     19	
+     20	**Capabilities** (literal, `docs/project-plan.md`):
+     21	
+     22	- Serviço de armazenamento de arquivos (vídeos e thumbnails)
+     23	- Serviço de processamento em segundo plano (filas)
+     24	- Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+     25	- Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+     26	- Processamento automático do vídeo após upload (extração de duração e metadados)
+     27	- Geração automática de thumbnail a partir de um frame do vídeo
+     28	- URL única por vídeo, sem conflito com outros vídeos
+     29	- Reprodução via streaming (sem necessidade de download completo)
+     30	- Download do vídeo pelo usuário
+     31	
+     32	**Out of scope:** _Not specified._
+     33	
+     34	**Deliverables:** upload de até 10GB funcional, processamento automático do vídeo, streaming funcionando, URLs únicas geradas.
+     35	
+     36	**Affected subprojects:** _None named explicitly for this phase in project-plan.md._
+     37	
+     38	**Deferred subprojects:** _None._
+     39	
+     40	**Sequencing notes:** "> Depende de: Fase 01, Fase 02". Intro sentence: "Upload de arquivos grandes sem travar o sistema, processamento automático do vídeo e geração de URL única."
+     41	
+     42	**Neighbors (for boundary detection only):**
+     43	
+     44	- **Phase 02:** Cadastro, Login e Gerenciamento de Cont … (+23409 chars)
+  ⎿  1	---
+     2	name: plan-pipeline
+     3	description: "Entry point and shared conventions for the plan pipeline (phase and task modes). Invoke directly when the user asks about planning without specifying a stage — this skill orients them to the pipeline stages (context → validate → resolve → build → specs [optional]). For actual work, use the stage skills: plan-context, plan-validate, plan-resolve, plan-build, plan-test-specs."
+     4	disable-model-invocation: true
+     5	---
+     6	
+     7	# Plan Pipeline Overview
+     8	
+     9	Planning is a pipeline of up to **five stages** that works for both project phases and ad-hoc tasks. Each stage is a separate skill with one responsibility and one artifact. Stages 1-4 (context → validate → resolve → build) are the canonical happy path; Stage 5 (`/plan-test-specs`) is optional and only fires when the build emitted spec placeholders. The stages share the conventions defined below — every stage skill references this document instead of repeating them.
+     10	
+     11	```
+     12	/research [opcional em task mode]       → docs/decisions/technical-decisions-{slug}.md
+     13	/plan-context <NN | slug | "prose">     → docs/{phases|tasks}/{dir}/context.md
+     14	/plan-validate <NN | slug>              → docs/{phases|tasks}/{dir}/validation.md
+     15	/plan-resolve <NN | slug>               → edits decisions doc + context.md + validation.md + library-refs.md
+     16	/plan-validate <NN | slug>              → re-run until status: clean
+     17	/plan-build <NN | slug>                 → docs/{phases|tasks}/{dir}/{name}.md
+     18	/plan-test-specs <NN | slug>                 → <subproject>/specs/<scenario>.plan.md
+     19	```
+     20	
+     21	When the user asks generically to "plan phase NN" or "plan this task", direct them to `/plan-context <arg>` first. Each stage aborts with an explicit next-command when a precondition is missing, so the pipeline self-guides once started.
+     22	
+     23	**Alternative front-door — `/decide`.** When the user input is a free-text need rather than a structured pipeline argument (e.g., "quero mudar X", "tem de … (+32696 chars)
+● Bash(head -12 docs/decisions/technical-decisions-phase-03-videos.md; echo ---; for f in docs/project-plan.md docs/decisions/technical-decisions-phase-03-videos.md docs/decisions/technical-decisions-openapi-docs-nestjs.md docs/phases/phase-01-configuracao-base/context.md docs/phases/phase-02-auth/context.md docs/phases/phase-02-auth-frontend/context.md .claude/skills/testing-guide-nestjs-project/SKILL.md docs/phases/phase-03-videos/context.md; do echo "$f $(date -r "$f" +%Y-%m-%dT%H:%M:%S%z) $(stat -f %m "$f")"; done; echo ---; grep -l '^scope_type: phase$' docs/decisions/technical-decisions-*.md; e … (+99 chars))
+  ⎿  ---
+     scope_type: phase
+     related_phases: [3]
+     status: pending
+     date: 2026-10-15
+     scope_description: "Backend side of Phase 03: how S3-compatible object storage is used (client lib, local MinIO image, endpoint topology, key layout), queue technology and video worker runtime, resumable 10GB direct-to-storage upload, processing trigger, FFmpeg/ffprobe metadata + thumbnail extraction, video status lifecycle and failure handling, unique public video identifier, and streaming/download delivery."
+     ---
+     
+     # Technical Decisions — Phase 03: Upload e Processamento de Vídeos
+     
+     _Subprojects in scope:_
+     
+     ---
+     docs/project-plan.md 2026-10-15T13:27:03-0300 1792081623
+     docs/decisions/technical-decisions-phase-03-videos.md 2026-10-15T13:56:13-0300 1792083373
+     docs/decisions/technical-decisions-openapi-docs-nestjs.md 2026-10-15T13:28:45-0300 1792081725
+     docs/phases/phase-01-configuracao-base/context.md 2026-10-15T13:28:45-0300 1792081725
+     docs/phases/phase-02-auth/context.md 2026-10-15T13:28:45-0300 1792081725
+     docs/phases/phase-02-auth-frontend/context.md 2026-10-15T13:28:45-0300 1792081725
+     .claude/skills/testing-guide-nestjs-project/SKILL.md 2026-10-15T13:27:02-0300 1792081622
+     docs/phases/phase-03-videos/context.md 2026-10-15T14:01:54-0300 1792083714
+     ---
+     docs/decisions/technical-decisions-phase-01-configuracao-base.md
+     docs/decisions/technical-decisions-phase-02-auth-frontend.md
+     docs/decisions/technical-decisions-phase-02-auth.md
+     docs/decisions/technical-decisions-phase-03-videos.md
+     ---
+     docs/decisions/technical-decisions-phase-03-videos.md
+● Write(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md (9463 chars))
+  ⎿  File created successfully at: /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md (file state is current in your context — no need to Read it back)
+● Validation for phase 3 is **dirty**, with 19 open issues: 4 places where the scope is too vague and 15 technical decisions still pending. The report is in `docs/phases/phase-03-videos/validation.md`.
+
+**Unclear scope (4 issues):**
+- **AMB-1 — the UI side has no owner.** The decisions doc calls this slice the "Backend side of Phase 03", but it doesn't list which capabilities it covers, so by default it claims all of them. Yet there's no screen inventory and nothing is marked deferred or non-UI. The upload, playback and download features each need a screen. Your options:
+  - mark the UI parts as deferred to a future frontend slice, as Phase 02 did with `phase-02-auth-frontend`;
+  - run `/screen-inventory`;
+  - mark them as non-UI.
+- **AMB-2 — the draft video record is undefined.** Two things are open: whether a video belongs to the user or to their channel, and which fields it starts with (for example, a title from the client or one taken from the filename). The issue also asks you to confirm that editing those fields belongs to Phase 04.
+- **AMB-3 — processing outputs aren't specified.** The scope doesn't say which metadata fields are saved besides duration. It also doesn't say which frame becomes the thumbnail, or its size and format.
+- **AMB-4 — access to streaming and download isn't defined.** Open points:
+  - who can watch or download (anonymous visitors, logged-in users, or only the owner);
+  - what happens while a video is still a draft, processing, or failed;
+  - which visibility rules wait for Phase 04.
+
+**Pending decisions (OQ-1 to OQ-15):** all 15 decisions in this phase (TD-01 to TD-15) are still open, so the checks that compare decisions against each other and against earlier phases had nothing to test yet.
+
+Nothing else turned up: no contradictions, no missing decisions, no gaps from earlier phases, and no conflicts with decisions inherited from them. Error format and API docs are already covered by those inherited decisions. The UI-coverage and cross-slice checks didn't apply, because there's no screen inventory and this is the only slice for phase 3. The contract-sync check didn't apply either, for the same reason: it only runs when a phase has UI scope.
+
+Next, run `/plan-resolve phase-03-videos`, then `/plan-validate phase-03-videos` again. Expect new conflicts to show up once the 15 decisions are made, since they can only be checked then. TD-07's direct browser upload against the Phase 02 rule that the frontend's server routes are the only callers of the backend API is one to watch.
+
+=== result: success turns=6 cost=$0.811794 duration=104s
+
+=== session 5f0ea033-a935-4bc8-a854-537d65fb6b20 model=claude-opus-5-5 cwd=/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube
+● Bash(ls docs/phases/phase-03-videos/ docs/decisions/ docs/rules 2>&1; wc -l docs/phases/phase-03-videos/* docs/decisions/*; ls .claude/skills/)
+  ⎿  ls: docs/rules: No such file or directory
+     docs/decisions/:
+     technical-decisions-next-frontend-config-base.md
+     technical-decisions-next-frontend-msw-foundation.md
+     technical-decisions-next-frontend-openapi-typing.md
+     technical-decisions-openapi-docs-nestjs.md
+     technical-decisions-phase-01-configuracao-base.md
+     technical-decisions-phase-02-auth-frontend.md
+     technical-decisions-phase-02-auth.md
+     technical-decisions-phase-03-videos.md
+     
+     docs/phases/phase-03-videos/:
+     context.md
+     validation.md
+          284 docs/phases/phase-03-videos/context.md
+          124 docs/phases/phase-03-videos/validation.md
+          193 docs/decisions/technical-decisions-next-frontend-config-base.md
+          394 docs/decisions/technical-decisions-next-frontend-msw-foundation.md
+          295 docs/decisions/technical-decisions-next-frontend-openapi-typing.md
+          122 docs/decisions/technical-decisions-openapi-docs-nestjs.md
+          205 docs/decisions/technical-decisions-phase-01-configuracao-base.md
+          360 docs/decisions/technical-decisions-phase-02-auth-frontend.md
+          316 docs/decisions/technical-decisions-phase-02-auth.md
+          490 docs/decisions/technical-decisions-phase-03-videos.md
+         2783 total
+     decide
+     figma-apply-tokens-tailwind-v4
+     figma-audit-tokens
+     generate-test-guide
+     implement
+     implement-phase
+     nestjs-best-practices
+     next-best-practices
+     plan-build
+     plan-context
+     plan-phase
+     plan-pipeline
+     plan-resolve
+     plan-rule-author
+     plan-test-specs
+     plan-validate
+     playwright-cli
+     research
+     screen-inventory
+     testing-guide-nestjs-project
+     testing-guide-next-frontend
+     typeorm
+     vercel-react-best-practices
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	status: dirty
+     5	issue_count: 19
+     6	sources_mtime:
+     7	  docs/phases/phase-03-videos/context.md: "2026-10-15T14:01:54-03:00"
+     8	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T13:56:13-03:00"
+     9	issues:
+     10	  - id: AMB-1
+     11	    status: open
+     12	    summary: "UI side of streaming/download/upload neither inventoried, deferred, nor Non-UI"
+     13	  - id: AMB-2
+     14	    status: open
+     15	    summary: "Draft pre-registration: owner (user vs channel) and initial fields undefined"
+     16	  - id: AMB-3
+     17	    status: open
+     18	    summary: "Processing outputs unspecified: which metadata fields, which thumbnail frame"
+     19	  - id: AMB-4
+     20	    status: open
+     21	    summary: "Stream/download access rules by viewer and video status undefined vs Phase 04"
+     22	  - id: OQ-1
+     23	    status: open
+     24	    summary: "TD-01 pending — Message Queue Technology"
+     25	  - id: OQ-2
+     26	    status: open
+     27	    summary: "TD-02 pending — Video Worker Runtime Topology"
+     28	  - id: OQ-3
+     29	    status: open
+     30	    summary: "TD-03 pending — S3 Client Library"
+     31	  - id: OQ-4
+     32	    status: open
+     33	    summary: "TD-04 pending — Local S3-Compatible Image Sourcing (MinIO)"
+     34	  - id: OQ-5
+     35	    status: open
+     36	    summary: "TD-05 pending — Storage Endpoint Topology for Presigned URLs"
+     37	  - id: OQ-6
+     38	    status: open
+     39	    summary: "TD-06 pending — Bucket and Object Key Layout"
+     40	  - id: OQ-7
+     41	    status: open
+     42	    summary: "TD-07 pending — Large Upload Protocol (10GB, resumable, not proxied)"
+     43	  - id: OQ-8
+     44	    status: open
+     45	    summary: "TD-08 pending — Upload Completion Detection and Processing Trigger"
+     46	  - id: OQ-9
+     47	    status: open
+     48	    summary: "TD-09 pending — Accepted Input Formats and Playback Compatibility"
+     49	  - id: OQ-10
+     50	    status: open
+     51	    summary: "TD-10 pending — Video Status Lifecycle Model"
+     52	  - id: OQ-11
+     53	    status: open
+     54	    summary: "TD-11 pending — FFmpeg/ffprobe Integration Approach"
+     55	  - id: OQ-12
+     56	     … (+7855 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-pipeline/SKILL.md)
+  ⎿  1	---
+     2	name: plan-pipeline
+     3	description: "Entry point and shared conventions for the plan pipeline (phase and task modes). Invoke directly when the user asks about planning without specifying a stage — this skill orients them to the pipeline stages (context → validate → resolve → build → specs [optional]). For actual work, use the stage skills: plan-context, plan-validate, plan-resolve, plan-build, plan-test-specs."
+     4	disable-model-invocation: true
+     5	---
+     6	
+     7	# Plan Pipeline Overview
+     8	
+     9	Planning is a pipeline of up to **five stages** that works for both project phases and ad-hoc tasks. Each stage is a separate skill with one responsibility and one artifact. Stages 1-4 (context → validate → resolve → build) are the canonical happy path; Stage 5 (`/plan-test-specs`) is optional and only fires when the build emitted spec placeholders. The stages share the conventions defined below — every stage skill references this document instead of repeating them.
+     10	
+     11	```
+     12	/research [opcional em task mode]       → docs/decisions/technical-decisions-{slug}.md
+     13	/plan-context <NN | slug | "prose">     → docs/{phases|tasks}/{dir}/context.md
+     14	/plan-validate <NN | slug>              → docs/{phases|tasks}/{dir}/validation.md
+     15	/plan-resolve <NN | slug>               → edits decisions doc + context.md + validation.md + library-refs.md
+     16	/plan-validate <NN | slug>              → re-run until status: clean
+     17	/plan-build <NN | slug>                 → docs/{phases|tasks}/{dir}/{name}.md
+     18	/plan-test-specs <NN | slug>                 → <subproject>/specs/<scenario>.plan.md
+     19	```
+     20	
+     21	When the user asks generically to "plan phase NN" or "plan this task", direct them to `/plan-context <arg>` first. Each stage aborts with an explicit next-command when a precondition is missing, so the pipeline self-guides once started.
+     22	
+     23	**Alternative front-door — `/decide`.** When the user input is a free-text need rather than a structured pipeline argument (e.g., "quero mudar X", "tem de … (+32696 chars)
+● Bash(for f in docs/phases/phase-03-videos/context.md docs/decisions/technical-decisions-phase-03-videos.md; do echo "$f $(date -r $(stat -f %m $f) +%Y-%m-%dT%H:%M:%S%z)"; done; head -20 docs/decisions/technical-decisions-phase-03-videos.md; grep -n '^### TD-\|^\*\*Decision:\*\*\|^\*\*Libraries\|^---$\|^## ' docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  docs/phases/phase-03-videos/context.md 2026-10-15T14:01:54-0300
+     docs/decisions/technical-decisions-phase-03-videos.md 2026-10-15T13:56:13-0300
+     ---
+     scope_type: phase
+     related_phases: [3]
+     status: pending
+     date: 2026-10-15
+     scope_description: "Backend side of Phase 03: how S3-compatible object storage is used (client lib, local MinIO image, endpoint topology, key layout), queue technology and video worker runtime, resumable 10GB direct-to-storage upload, processing trigger, FFmpeg/ffprobe metadata + thumbnail extraction, video status lifecycle and failure handling, unique public video identifier, and streaming/download delivery."
+     ---
+     
+     # Technical Decisions — Phase 03: Upload e Processamento de Vídeos
+     
+     _Subprojects in scope:_
+     
+     - `nestjs-project/` — owns every TD below: API endpoints (upload orchestration, delivery URLs), the video worker (separate Compose service), and the Compose infrastructure (object storage, queue broker). All service-to-service hosts use Compose service names (`db`, `minio`, `redis`, …).
+     - `next-frontend/` — no open decision in this document. The video UI is out of scope for this phase. The TDs marked `Cross-layer` (TD-07, TD-14, TD-15) define the HTTP contracts that the frontend will consume in later phases. Under `next-frontend-config-base/TD-03` (Strict BFF), the small JSON control-plane calls go through BFF Route Handlers. Large byte transfers go browser ↔ object storage directly through presigned URLs, as that TD already anticipated.
+     
+     **Constraints inherited and not reopened:** S3-compatible object storage (MinIO locally, AWS S3 in production) per the brief and `docs/diagrams/software-arch.mermaid`; `@nestjs/config` + Joi env validation (`phase-01-configuracao-base/TD-01..TD-03`); custom JWT guards (`phase-02-auth/TD-02`); domain error envelope (`phase-02-auth/TD-07`); OpenAPI artifact consumed by the frontend via codegen (`openapi-docs-nestjs/TD-02`, `next-frontend-openapi-typing/TD-01`); Strict BFF (`next-frontend-config-base/TD-03`).
+     
+     **Instal … (+1520 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  1	---
+     2	scope_type: phase
+     3	related_phases: [3]
+     4	status: pending
+     5	date: 2026-10-15
+     6	scope_description: "Backend side of Phase 03: how S3-compatible object storage is used (client lib, local MinIO image, endpoint topology, key layout), queue technology and video worker runtime, resumable 10GB direct-to-storage upload, processing trigger, FFmpeg/ffprobe metadata + thumbnail extraction, video status lifecycle and failure handling, unique public video identifier, and streaming/download delivery."
+     7	---
+     8	
+     9	# Technical Decisions — Phase 03: Upload e Processamento de Vídeos
+     10	
+     11	_Subprojects in scope:_
+     12	
+     13	- `nestjs-project/` — owns every TD below: API endpoints (upload orchestration, delivery URLs), the video worker (separate Compose service), and the Compose infrastructure (object storage, queue broker). All service-to-service hosts use Compose service names (`db`, `minio`, `redis`, …).
+     14	- `next-frontend/` — no open decision in this document. The video UI is out of scope for this phase. The TDs marked `Cross-layer` (TD-07, TD-14, TD-15) define the HTTP contracts that the frontend will consume in later phases. Under `next-frontend-config-base/TD-03` (Strict BFF), the small JSON control-plane calls go through BFF Route Handlers. Large byte transfers go browser ↔ object storage directly through presigned URLs, as that TD already anticipated.
+     15	
+     16	**Constraints inherited and not reopened:** S3-compatible object storage (MinIO locally, AWS S3 in production) per the brief and `docs/diagrams/software-arch.mermaid`; `@nestjs/config` + Joi env validation (`phase-01-configuracao-base/TD-01..TD-03`); custom JWT guards (`phase-02-auth/TD-02`); domain error envelope (`phase-02-auth/TD-07`); OpenAPI artifact consumed by the frontend via codegen (`openapi-docs-nestjs/TD-02`, `next-frontend-openapi-typing/TD-01`); Strict BFF (`next-frontend-config-base/TD-03`).
+     17	
+     18	**Installed baseline checked:** `@nestjs/core` 11.1.16, `typeorm` 0.3.28, Node 25 (`node:25.6.0-slim` dev  … (+41786 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	sources_mtime:
+     5	  docs/project-plan.md: "2026-10-15T13:27:03-03:00"
+     6	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T13:56:13-03:00"
+     7	  docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-15T13:28:45-03:00"
+     8	  docs/phases/phase-01-configuracao-base/context.md: "2026-10-15T13:28:45-03:00"
+     9	  docs/phases/phase-02-auth/context.md: "2026-10-15T13:28:45-03:00"
+     10	  docs/phases/phase-02-auth-frontend/context.md: "2026-10-15T13:28:45-03:00"
+     11	  .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-10-15T13:27:02-03:00"
+     12	---
+     13	
+     14	# phase-03-videos — Context
+     15	
+     16	## Scope
+     17	
+     18	**Phase name:** Fase 03 — Upload e Processamento de Vídeos
+     19	
+     20	**Capabilities** (literal, `docs/project-plan.md`):
+     21	
+     22	- Serviço de armazenamento de arquivos (vídeos e thumbnails)
+     23	- Serviço de processamento em segundo plano (filas)
+     24	- Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+     25	- Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+     26	- Processamento automático do vídeo após upload (extração de duração e metadados)
+     27	- Geração automática de thumbnail a partir de um frame do vídeo
+     28	- URL única por vídeo, sem conflito com outros vídeos
+     29	- Reprodução via streaming (sem necessidade de download completo)
+     30	- Download do vídeo pelo usuário
+     31	
+     32	**Out of scope:** _Not specified._
+     33	
+     34	**Deliverables:** upload de até 10GB funcional, processamento automático do vídeo, streaming funcionando, URLs únicas geradas.
+     35	
+     36	**Affected subprojects:** _None named explicitly for this phase in project-plan.md._
+     37	
+     38	**Deferred subprojects:** _None._
+     39	
+     40	**Sequencing notes:** "> Depende de: Fase 01, Fase 02". Intro sentence: "Upload de arquivos grandes sem travar o sistema, processamento automático do vídeo e geração de URL única."
+     41	
+     42	**Neighbors (for boundary detection only):**
+     43	
+     44	- **Phase 02:** Cadastro, Login e Gerenciamento de Cont … (+23409 chars)
+● Bash(grep -n -A4 '^\*\*Decision:\*\*' docs/decisions/technical-decisions-phase-02-auth.md | head -60; echo ----; grep -n '^\*\*Libraries\|^\*\*Note\|^\*\*Decision' docs/decisions/technical-decisions-phase-02-auth-frontend.md | head; ls docs/phases/*/library-refs.md; )
+  ⎿  40:**Decision:** B (Argon2id)
+     41-
+     42----
+     43-
+     44-## TD-02: Auth Library Approach
+     --
+     66:**Decision:** B (Custom guards with @nestjs/jwt only)
+     67-
+     68-**Note:** Decision deliberately diverged from the Recommendation during implementation — custom guards were preferred over `@nestjs/passport` to keep the dependency surface smaller; social login is not on the near-term roadmap, so the plugin-architecture benefit did not justify the extra abstraction layer.
+     69-
+     70----
+     --
+     99:**Decision:** A (Refresh Token Rotation)
+     100-
+     101----
+     102-
+     103-## TD-04: Email Confirmation & Password Reset Tokens
+     --
+     125:**Decision:** B (Random Opaque Tokens in Database)
+     126-
+     127----
+     128-
+     129-## TD-05: Email Sending Infrastructure
+     --
+     156:**Decision:** A (@nestjs-modules/mailer)
+     157-
+     158----
+     159-
+     160-## TD-06: Request Validation Library
+     --
+     182:**Decision:** A (class-validator + class-transformer)
+     183-
+     184----
+     185-
+     186-## TD-07: Error Response Standardization
+     --
+     213:**Decision:** A (Custom Domain Exception Filter)
+     214-
+     215----
+     216-
+     217-## TD-08: Rate Limiting Strategy
+     --
+     239:**Decision:** A (@nestjs/throttler)
+     240-
+     241----
+     242-
+     243-## TD-09: Refresh Token Format
+     --
+     265:**Decision:** A (JWT) — Consistency with the access token format is preferred. The team wants a single token infrastructure using `@nestjs/jwt` for both access and refresh tokens. Payload data (`userId`, `tokenFamily`) simplifies logging and debugging. Data leakage risk is acceptable given HTTPS enforcement.
+     266-
+     267-**Note:** Decision deliberately diverged from the Recommendation — JWT was kept to reuse the access-token signing/verification infrastructure (`@nestjs/jwt`), trading token size and base64-readability for a single token format across the codebase.
+     268-
+     269----
+     --
+     300:**Decision:** A — `[a-z0-9_]` allowlist with `user_<8-char-random>` fallback when the prefix yields an empty string.
+     301-
+     302----
+     303-
+     304-## Decisions Summary
+     ----
+     62:**Decision:** A (Custom BFF cookie-based session — `next/headers` + small helper)
+     103:**Decis … (+653 chars)
+● Preflight passed (validation.md is dirty and not stale). Now I'm checking current npm versions and the existing library-refs format before I write the decisions.
+● Bash(head -40 docs/phases/phase-02-auth-frontend/library-refs.md; grep -n '^### \|^## ' docs/phases/phase-02-auth-frontend/library-refs.md | head; cat nestjs-project/Dockerfile.dev 2>/dev/null | head -20; grep -n '"@nestjs/core"\|"typeorm"\|"engines"' nestjs-project/package.json; for p in @nestjs/bullmq bullmq @aws-sdk/client-s3 @aws-sdk/s3-request-presigner; do echo "$p $(npm view $p version 2>&1 | tail -1) peer: $(npm view $p peerDependencies --json 2>/dev/null | tr -d '\n ')"; done)
+  ⎿  ---
+     libs:
+       iron-session:
+         version: "^8.x"
+         context7_id: "/vvo/iron-session"
+         fetched_at: "2026-05-14T11:05:00-03:00"
+       react-hook-form:
+         version: "^7.66.0"
+         context7_id: "/react-hook-form/documentation"
+         fetched_at: "2026-05-14T11:05:00-03:00"
+       "@hookform/resolvers":
+         version: "^3.x"
+         context7_id: "/react-hook-form/resolvers"
+         fetched_at: "2026-05-14T11:05:00-03:00"
+     sources_mtime:
+       docs/decisions/technical-decisions-phase-02-auth-frontend.md: "2026-05-14T11:03:30-03:00"
+     ---
+     
+     # phase-02-auth-frontend — Library References
+     
+     Distilled docs for libraries decided in this slice. Pulled via Context7. Re-fetch when the underlying TD changes (resolve refreshes this file when the lib set in `## Decisions Index` drifts from the cached set here).
+     
+     ## iron-session
+     
+     **Source:** `/vvo/iron-session` (Context7) — High reputation, 86 snippets, benchmark 87.4. Maps directly to `phase-02-auth-frontend/TD-02` Decision B.
+     
+     ### Core API for Next.js App Router
+     
+     `iron-session` is the encrypted cookie-store primitive used by `lib/auth/session.ts`. The canonical pattern for App Router uses `getIronSession<T>(cookies(), sessionOptions)` — `cookies()` comes from `next/headers` and works in **Route Handlers, Server Components, Server Actions, and Middleware**.
+     
+     ```typescript
+     import { getIronSession, type SessionOptions } from "iron-session";
+     import { cookies } from "next/headers";
+     
+     export interface SessionData {
+       accessToken: string;
+       refreshToken: string;
+       userId: string;
+       email: string;
+       channelSlug: string;
+     23:## iron-session
+     27:### Core API for Next.js App Router
+     66:### Reading / writing the session
+     91:### Key contracts for Phase 02
+     99:### MSW integration notes (TD-02 + `next-frontend-msw-foundation/TD-04`)
+     105:## react-hook-form
+     109:### useForm + zodResolver — canonical pattern for shadcn Form
+     186:### Mapping the backend error envelope to fields (OQ-12 resolution)
+     197:### Submission state for the loading UI (OQ-12 follow-up)
+     201:### Testing notes (`testing- … (+606 chars)
+● Bash(npm view bullmq@6.3.15 peerDependenciesMeta dependencies engines --json 2>/dev/null | head -40; npm view @nestjs/bullmq@12.0.0 engines dependencies --json; npm view @nestjs/bullmq time --json | tail -5; npm view bullmq time --json | tail -4; npm view @aws-sdk/client-s3 engines --json; npm view @aws-sdk/client-s3 time --json | tail -3; grep -n '"@nestjs/common"\|"@nestjs/core"' nestjs-project/package-lock.json | head -4; grep -n -A1 '"node_modules/@nestjs/core"' nestjs-project/package-lock.json)
+  ⎿  {
+       "peerDependenciesMeta": {
+         "pg": {
+           "optional": true
+         },
+         "redis": {
+           "optional": true
+         },
+         "ioredis": {
+           "optional": true
+         },
+         "bullmq-otel": {
+           "optional": true
+         }
+       },
+       "dependencies": {
+         "tslib": "2.8.1",
+         "semver": "7.8.5",
+         "msgpackr": "2.1.0",
+         "cron-parser": "5.10.2",
+         "node-abort-controller": "3.1.1"
+       },
+       "engines": {
+         "node": ">=14.17.0"
+       }
+     }
+     {
+       "tslib": "2.8.1",
+       "@nestjs/bull-shared": "^12.0.0"
+     }
+       "11.0.3": "2025-07-24T09:47:50.904Z",
+       "11.0.4": "2025-10-10T13:15:32.268Z",
+       "11.0.5": "2026-08-07T09:31:48.906Z",
+       "12.0.0": "2026-08-27T07:44:13.039Z"
+     }
+       "6.3.13": "2026-10-12T08:54:31.008Z",
+       "6.3.14": "2026-10-13T08:09:30.987Z",
+       "6.3.15": "2026-10-14T03:56:58.510Z"
+     }
+     {
+       "node": ">=20.0.0"
+     }
+       "3.1151.0": "2026-10-13T18:59:52.007Z",
+       "3.1152.0": "2026-10-14T18:50:19.971Z"
+     }
+     13:        "@nestjs/common": "^11.0.1",
+     15:        "@nestjs/core": "^11.0.1",
+     2355:        "@nestjs/common": ">=7.0.9",
+     2356:        "@nestjs/core": ">=7.0.9",
+     2777:    "node_modules/@nestjs/core": {
+     2778-      "version": "11.1.16",
+● Bash(npm view ioredis version; npm view ioredis time --json | tail -2; npm view @nestjs/bull-shared@12.0.0 dependencies peerDependencies --json; npm view bullmq@6 version --json | tail -3; npm view bullmq time --json | grep '"6.0.0"'; (docker image inspect node:25.6.0-slim --format '{{.Os}}' && docker run --rm node:25.6.0-slim cat /etc/debian_version) 2>&1 | tail -2; docker manifest inspect redis:8.2.2-alpine >/dev/null 2>&1 && echo redis-8.2.2-alpine ok; docker manifest inspect redis:8.2.2 >/dev/null 2>&1 && echo redis-8.2.2 ok)
+  ⎿  6.0.0
+       "6.1.0-beta.1": "2026-10-12T15:49:15.266Z"
+     }
+     {
+       "dependencies": {
+         "tslib": "2.8.1"
+       },
+       "peerDependencies": {
+         "@nestjs/core": "^10.0.0 || ^11.0.0 || ^12.0.0",
+         "@nestjs/common": "^10.0.0 || ^11.0.0 || ^12.0.0"
+       }
+     }
+       "6.3.14",
+       "6.3.15"
+     ]
+       "6.0.0": "2026-07-30T11:56:11.247Z",
+     
+     Error response from daemon: No such image: node:25.6.0-slim
+     redis-8.2.2-alpine ok
+     redis-8.2.2 ok
+● Bash(ls; cat compose.yaml 2>/dev/null || cat nestjs-project/compose.yaml 2>/dev/null | head -60; docker ps --format '{{.Names}} {{.Image}}'; curl -s 'https://hub.docker.com/v2/repositories/library/redis/tags?page_size=40&ordering=last_updated' | python3 -c 'import sys,json;print([t["name"] for t in json.load(sys.stdin)["results"]])')
+  ⎿  CLAUDE.md
+     FC Tube sem padrão.fig
+     FC Tube.fig
+     README.md
+     _claude-sessions
+     docs
+     mcp.example.py
+     nestjs-project
+     next-frontend
+     scripts
+     skills-lock.json
+     whiteboard.svg
+     services:
+       nestjs-api:
+         build: 
+           context: .
+           dockerfile: Dockerfile.dev
+         ports:
+           - 3000:3000
+         volumes:
+           - .:/home/node/app
+         depends_on:
+           db:
+             condition: service_healthy
+           mailpit:
+             condition: service_started
+     
+       db:
+         image: postgres:17
+         ports:
+           - "5432:5432"
+         environment:
+           - POSTGRES_USER=streamtube
+           - POSTGRES_PASSWORD=streamtube
+           - POSTGRES_DB=streamtube
+         healthcheck:
+           test: ["CMD-SHELL", "pg_isready -U streamtube"]
+           interval: 5s
+           timeout: 5s
+           retries: 5
+     
+       mailpit:
+         image: axllent/mailpit
+         ports:
+           - "1025:1025"
+           - "8025:8025"
+     
+     
+     nestjs-project-nestjs-api-1 nestjs-project-nestjs-api
+     nestjs-project-db-1 postgres:17
+     nestjs-project-mailpit-1 axllent/mailpit
+     sdd-test-keycloak-1 quay.io/keycloak/keycloak:26.4
+     sdd-test-postgres-1 postgres:17-alpine
+     ['trixie', 'latest', '8.8.3-trixie', '8.8.3', '8.8-trixie', '8.8', '8.6.7-trixie', '8.6.7', '8.6-trixie', '8.6', '8.4.7-trixie', '8.4.7', '8.4-trixie', '8.4', '8.10.2-trixie', '8.10.2', '8.10-trixie', '8.10', '8-trixie', '8', 'bookworm', '8.2.10-bookworm', '8.2.10', '8.2-bookworm', '8.2', '8-bookworm', '7.4.11-bookworm', '7.4.11', '7.4-bookworm', '7.4', '7.2.16-bookworm', '7.2.16', '7.2-bookworm', '7.2', '7-bookworm', '7', '6.2.24-bookworm', '6.2.24', '6.2-bookworm', '6.2']
+● Bash(docker exec nestjs-project-nestjs-api-1 sh -c 'cat /etc/debian_version; node -v; apt-cache policy ffmpeg 2>/dev/null | head -3'; docker manifest inspect redis:8.10.2-alpine >/dev/null 2>&1 && echo 'redis:8.10.2-alpine ok'; curl -s 'https://hub.docker.com/v2/repositories/library/redis/tags/8.10.2' | python3 -c 'import sys,json;print(json.load(sys.stdin)["last_updated"])')
+  ⎿  12.13
+     v25.6.0
+     ffmpeg:
+       Installed: (none)
+       Candidate: 7:5.1.9-0+deb12u1
+     redis:8.10.2-alpine ok
+     2026-10-07T21:05:07.532045Z
+● Bash(ls .claude/agents/; grep -n 'Note\|Decision:\|Revisions\|Clarif' .claude/agents/decisions-detail-reader.md | head -40)
+  ⎿  decisions-correlator.md
+     decisions-detail-reader.md
+     decisions-reader.md
+     inventory-digest-reader.md
+     phases-reader.md
+     plan-reader.md
+     45:   - Find `**Decision:**`. If `_[pending]_` or absent, skip silently.
+     62:   - **Revisions block (optional).** Locate `**Revisions:**` line. If present, capture all bullet lines that follow (each `- YYYY-MM-DD — …` entry, including indented continuation lines for multi-line bullets) until the next blank line OR `---` separator OR next `**` field, whichever comes first. Preserve chronological order as written on disk (earliest first). If `**Revisions:**` is absent, omit the block entirely from output (no placeholder).
+     88:**Revisions:**
+     101:- **Field order per TD** — `Recommendation` → `Renders in` (when present in source) → `Libraries` → `Revisions` (when block exists). The `Renders in` line is **omitted entirely** when `**Renders in:**` is absent from the source TD (no `—` placeholder; absence carries semantic meaning consumed downstream by `plan-build` A2 filter as default-by-inference). The Revisions block is **omitted entirely** when `**Revisions:**` is absent from the source TD; no `_None_` placeholder. **Source-position alignment:** the rendered field order matches the canonical TD body source order (`Recommendation → Decision → Renders in → Libraries → Revisions`) minus the `Decision` field which this agent does not emit. This avoids any cognitive friction or rearrangement during read+emit.
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/agents/decisions-detail-reader.md)
+  ⎿  40	   - **Task mode:** 0 → return `"## Decisions Detail for Task {slug}\n\n_No decided TDs (task has no decisions doc yet)._"` and stop. 1 → proceed.
+     41	
+     42	5. **Extract TD headers per kept file.** `Grep -n '^## TD-' <file>` → header line numbers.
+     43	
+     44	6. **Per-TD status check** (bounded grep within each TD's line range):
+     45	   - Find `**Decision:**`. If `_[pending]_` or absent, skip silently.
+     46	   - If `<!-- status: superseded-by: ... -->` is on the line right after the TD header, skip silently.
+     47	   - Otherwise the TD is **decided** — proceed to extraction.
+     48	
+     49	7. **Per-decided-TD extraction** (bounded `Read` of the TD's line range):
+     50	   - **Recommendation prose.** Locate `**Recommendation:**`. The line is `**Recommendation:** Option X — <prose>`. Strip the `Option X — ` prefix (case-insensitive `Option` + single letter + em-dash, optionally bolded as `**Option X (Name)** —`). If the prose spans soft-wrapped lines, concatenate. If `**Recommendation:**` is missing, emit `**Recommendation:** _[missing — decisions doc malformed]_`.
+     51	
+     52	     **Stripping examples — apply ALWAYS when an Option-X token is present:**
+     53	     - `**Recommendation:** **Option A (@nestjs/passport)** — The project plan includes…` → `**Recommendation:** The project plan includes…`
+     54	     - `**Recommendation:** **Option B (Opaque)** — Since DB lookup is mandatory…` → `**Recommendation:** Since DB lookup is mandatory…`
+     55	     - `**Recommendation:** Option C — short rationale` → `**Recommendation:** short rationale`
+     56	     - `**Recommendation:** **Option A** — body text` → `**Recommendation:** body text`
+     57	
+     58	     **Do NOT strip when no Option-X token is present (just a bolded name):**
+     59	     - `**Recommendation:** **Argon2id** — For a greenfield…` → keep verbatim (no `Option X` token to strip).
+     60	   - **Renders in marker (optional).** Locate `**Renders in:**`; take value verbatim (`ui-contracts` or `frontend-runtime`). If absent, **omit the line entirely** from output (no place … (+932 chars)
+● ToolSearch({"query": "select:mcp__context7__resolve-library-id,mcp__context7__query-docs", "max_results": 2})
+  ⎿   
+● mcp__context7__resolve-library-id({"libraryName": "BullMQ", "query": "BullMQ v6 connection ioredis optional peer dependency, NestJS @nestjs/bullmq processor WorkerHost"})
+● mcp__context7__resolve-library-id({"libraryName": "AWS SDK for JavaScript v3", "query": "S3 multipart upload presigned UploadPart URLs getSignedUrl client-s3 forcePathStyle"})
+  ⎿  Available Libraries:
+     
+     - Title: BullMQ
+     - Context7-compatible library ID: /taskforcesh/bullmq
+     - Description: BullMQ - Message Queue and Batch processing for NodeJS and Python based on Redis
+     - Code Snippets: 4244
+     - Source Reputation: High
+     - Benchmark Score: 86.1
+     - Versions: v6.3.11
+     ----------
+     - Title: BullMQ
+     - Context7-compatible library ID: /websites/bullmq_io
+     - Description: BullMQ is a fast and robust Node.js queue system built on Redis, designed for modern microservice architectures to handle distributed job execution with features like job scheduling, retries, and concurrency control.
+     - Code Snippets: 2654
+     - Source Reputation: High
+     - Benchmark Score: 90.77
+     ----------
+     - Title: NestJS Bull
+     - Context7-compatible library ID: /nestjs/bull
+     - Description: NestJS Bull provides modules for integrating Bull and BullMQ, popular queueing libraries, into NestJS applications for efficient background job processing.
+     - Code Snippets: 316
+     - Source Reputation: High
+     - Benchmark Score: 85.06
+     ----------
+     - Title: NestJS Bull (DeepWiki)
+     - Context7-compatible library ID: /websites/deepwiki_nestjs_bull
+     - Description: NestJS Bull provides modules for integrating NestJS applications with Redis-based Bull and BullMQ queue systems to handle background job processing and task scheduling.
+     - Code Snippets: 406
+     - Source Reputation: High
+     - Benchmark Score: 58
+     ----------
+     - Title: BullMQ
+     - Context7-compatible library ID: /websites/api_bullmq_io
+     - Description: BullMQ is a fast and reliable Redis-based distributed queue for Node.js with rock solid stability, atomicity, and support for job priorities, delays, parent-child dependencies, and rate limiting.
+     - Code Snippets: 1104
+     - Source Reputation: High
+     - Benchmark Score: 76.22
+● mcp__context7__resolve-library-id({"libraryName": "NestJS", "query": "@nestjs/bullmq BullModule forRootAsync registerQueue Processor WorkerHost createApplicationContext"})
+  ⎿  Available Libraries:
+     
+     - Title: AWS SDK for JavaScript v3
+     - Context7-compatible library ID: /websites/aws_amazon_awsjavascriptsdk_v3
+     - Description: The AWS SDK for JavaScript v3 provides libraries, packages, and services to interact with Amazon Web Services (AWS) using JavaScript.
+     - Code Snippets: 74728
+     - Source Reputation: High
+     - Benchmark Score: 79.13
+     ----------
+     - Title: AWS SDK for JavaScript
+     - Context7-compatible library ID: /aws/aws-sdk-js-v3
+     - Description: The AWS SDK for JavaScript v3 is a modular and feature-rich SDK for interacting with Amazon Web Services, offering first-class TypeScript support and a new middleware stack.
+     - Code Snippets: 5598
+     - Source Reputation: High
+     - Benchmark Score: 78.36
+     ----------
+     - Title: AWS SDK for JavaScript v3
+     - Context7-compatible library ID: /websites/aws_amazon_sdk-for-javascript_v3_developer-guide
+     - Description: The AWS SDK for JavaScript v3 provides a JavaScript API for building applications and libraries for Node.js and browsers to interact with Amazon Web Services.
+     - Code Snippets: 5359
+     - Source Reputation: High
+     - Benchmark Score: 63.68
+     ----------
+     - Title: AWS SDK for JavaScript
+     - Context7-compatible library ID: /aws/aws-sdk-js
+     - Description: AWS SDK for JavaScript (v2) provides JavaScript developers with a robust library for interacting with Amazon Web Services APIs in their applications.
+     - Code Snippets: 144
+     - Source Reputation: High
+     - Benchmark Score: 48.92
+     ----------
+     - Title: AWS SDK for pandas
+     - Context7-compatible library ID: /aws/aws-sdk-pandas
+     - Description: AWS SDK for pandas enables easy integration with AWS services including Athena, Glue, Redshift, Timestream, OpenSearch, Neptune, DynamoDB, and S3 for data manipulation and analysis workflows.
+     - Code Snippets: 786
+     - Source Reputation: High
+     - Benchmark Score: 71.28
+● mcp__context7__resolve-library-id({"libraryName": "FFmpeg", "query": "ffprobe print_format json show_format show_streams; ffmpeg -ss single frame thumbnail scale; http protocol options"})
+  ⎿  Available Libraries:
+     
+     - Title: NestJS
+     - Context7-compatible library ID: /nestjs/docs.nestjs.com
+     - Description: NestJS is a progressive Node.js framework for building efficient and scalable server-side applications, utilizing Angular CLI and Dgeni for documentation generation.
+     - Code Snippets: 3705
+     - Source Reputation: High
+     - Benchmark Score: 86.59
+     ----------
+     - Title: NestJS
+     - Context7-compatible library ID: /websites/nestjs
+     - Description: NestJS is a progressive Node.js framework for building efficient, reliable, and scalable server-side applications.
+     - Code Snippets: 5318
+     - Source Reputation: High
+     - Benchmark Score: 83.19
+     ----------
+     - Title: NestJS
+     - Context7-compatible library ID: /nestjs/nest
+     - Description: A progressive Node.js framework for building efficient, scalable, and enterprise-grade server-side applications with TypeScript/JavaScript 🚀
+     - Code Snippets: 2133
+     - Source Reputation: High
+     - Benchmark Score: 70.85
+     - Versions: v11_1_6, v10_4_15, v10_4_6, v11.1.16, v12.0.1, v12.1.2
+     ----------
+     - Title: NestJS Bull
+     - Context7-compatible library ID: /nestjs/bull
+     - Description: NestJS Bull provides modules for integrating Bull and BullMQ, popular queueing libraries, into NestJS applications for efficient background job processing.
+     - Code Snippets: 316
+     - Source Reputation: High
+     - Benchmark Score: 85.06
+  ⎿  Available Libraries:
+     
+     - Title: FFmpeg
+     - Context7-compatible library ID: /websites/ffmpeg_documentation
+     - Description: FFmpeg is a complete, cross-platform solution to record, convert, stream, and play multimedia content, including audio and video.
+     - Code Snippets: 3843
+     - Source Reputation: High
+     - Benchmark Score: 74.51
+     ----------
+     - Title: FFmpeg
+     - Context7-compatible library ID: /websites/ffmpeg_doxygen_8_0
+     - Description: FFmpeg is a comprehensive multimedia framework providing libraries for encoding, decoding, filtering, I/O, muxing, demuxing, audio resampling, and video scaling.
+     - Code Snippets: 203229
+     - Source Reputation: High
+     - Benchmark Score: 63.48
+     ----------
+     - Title: FFmpeg
+     - Context7-compatible library ID: /ffmpeg/ffmpeg
+     - Description: FFmpeg is a comprehensive collection of libraries and tools to process multimedia content including audio, video, subtitles and related metadata.
+     - Code Snippets: 320
+     - Source Reputation: Medium
+     - Benchmark Score: 47.18
+     ----------
+     - Title: FFmpeg
+     - Context7-compatible library ID: /websites/ffmpeg_doxygen_trunk
+     - Description: FFmpeg is a comprehensive multimedia framework that provides libraries for encoding, decoding, filtering, format conversion, and device I/O operations for audio and video processing.
+     - Code Snippets: 99424
+     - Source Reputation: High
+     - Benchmark Score: 55.22
+     ----------
+     - Title: FFmpeg
+     - Context7-compatible library ID: /websites/ffmpeg_doxygen_7_0
+     - Description: FFmpeg is a comprehensive, cross-platform multimedia framework for recording, converting, and streaming audio and video, providing libraries for encoding, decoding, filtering, format handling, and more.
+     - Code Snippets: 247920
+     - Source Reputation: High
+     - Benchmark Score: 64.79
+● mcp__context7__query-docs({"libraryId": "/taskforcesh/bullmq", "query": "BullMQ v6 migration: ioredis optional peer dependency, how to pass a Redis connection (ioredis instance or connection options), breaking changes in v6", "language": "TypeScript"})
+● mcp__context7__query-docs({"libraryId": "/taskforcesh/bullmq", "query": "attempts and exponential backoff, UnrecoverableError, jobId deduplication, stalled jobs lockDuration, upsertJobScheduler repeatable job", "language": "TypeScript"})
+  ⎿  ### Breaking change: ioredis becomes optional peer dependency
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/changelog.md
+     
+     The changelog entry in the v6 release notes explicitly documents that ioredis is no longer installed as a direct dependency and is now an optional peer dependency that Redis users must install manually.
+     
+     ```markdown
+     * ioredis is no longer installed as a direct dependency and is now an optional peer dependency. Redis users must install ioredis explicitly.
+     ```
+     
+     --------------------------------
+     
+     ### Sentinel config is delegated entirely to ioredis
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/src/interfaces/redis-options.ts
+     
+     BullMQ has no sentinel-specific code. ConnectionOptions type is IORedis.RedisOptions & BaseOptions, so sentinel configuration (sentinels, name, role) is passed directly through to ioredis. The 'All sentinels are unreachable' error originates from ioredis, not BullMQ.
+     
+     ```typescript
+     import type * as IORedis from 'ioredis';
+     
+     export type RedisOptions = IORedis.RedisOptions & BaseOptions;
+     
+     export type ConnectionOptions =
+       | RedisOptions
+       | ClusterOptions
+       | IORedis.Redis
+       | IRedisClient
+       | IORedis.Cluster;
+     
+     // Usage example (not in repo, for illustration):
+     // new Queue('myqueue', {
+     //   connection: {
+     //     sentinels: [{ host: '...', port: 26379 }],
+     //     name: 'mymaster',
+     //     role: 'master',
+     //   }
+     // })
+     ```
+     
+     --------------------------------
+     
+     ### Reusing IORedis instance with Worker and maxRetriesPerRequest: null
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/bullmq/docs/gitbook/guide/connections.md
+     
+     Shows how to properly create an IORedis connection for reusing between Queue and Worker instances, with the critical maxRetriesPerRequest: null setting for Worker instances to enable indefinite retry behavior during disconnections.
+     
+     ```typescript
+     import { Worker } from 'bullmq';
+     import IORedis from 'ioredis';
+     
+     const connection = new IORedis({ maxRetriesPerRequest: null });
+     
+     // … (+2466 chars)
+● mcp__context7__query-docs({"libraryId": "/nestjs/bull", "query": "@nestjs/bullmq BullModule.forRootAsync with ConfigService, registerQueue, @Processor WorkerHost process method, InjectQueue, OnWorkerEvent, testing processors", "language": "TypeScript"})
+  ⎿  ### Use UnrecoverableError to stop retries
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/patterns/stop-retrying-jobs.md
+     
+     Throwing UnrecoverableError in a worker moves the job to the failed set without retries, overriding any attempts settings. The example shows a worker that always throws this error and a queue.add call with attempts and backoff.
+     
+     ```typescript
+     import { Worker, UnrecoverableError } from 'bullmq';
+     
+     const worker = new Worker(
+       'foo',
+       async job => {
+         doSomeProcessing();
+         throw new UnrecoverableError('Unrecoverable');
+       },
+       { connection },
+     );
+     
+     await queue.add(
+       'test-retry',
+       { foo: 'bar' },
+       {
+         attempts: 3,
+         backoff: 1000,
+       },
+     );
+     ```
+     
+     --------------------------------
+     
+     ### Add repeatable job with every and limit
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/guide/jobs/repeatable.md
+     
+     Sets up a queue and scheduler for the 'Paint' queue, then adds two repeatable jobs that run every 10 seconds with a limit of 100 executions each. The jobs use distinct jobIds to avoid deduplication.
+     
+     ```typescript
+     import { Queue, QueueScheduler } from 'bullmq';
+     
+     const myQueueScheduler = new QueueScheduler('Paint');
+     const myQueue = new Queue('Paint');
+     
+     // Repeat job every 10 seconds but no more than 100 times
+     await myQueue.add(
+       'bird',
+       { color: 'bird' },
+       {
+         repeat: {
+           every: 10000,
+           limit: 100,
+         },
+         jobId: 'colibri',
+       },
+     );
+     
+     await myQueue.add(
+       'bird',
+       { color: 'bird' },
+       {
+         repeat: {
+           every: 10000,
+           limit: 100,
+         },
+         jobId: 'pigeon',
+       },
+     );
+     ```
+     
+     --------------------------------
+     
+     ### Exponential backoff with delay
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/guide/retrying-failing-jobs.md
+     
+     Configures an exponential backoff strategy that retries after 2^(attempts-1) * delay milliseconds, with a delay of 1000 ms and up to 3 attempts.
+     
+     ```typescript
+     import { Queue } from 'bullmq';
+     
+     const myQueue = new Queue('foo');
+     
+     await queue.add(
+      … (+1768 chars)
+● mcp__context7__query-docs({"libraryId": "/aws/aws-sdk-js-v3", "query": "S3Client endpoint forcePathStyle MinIO; CreateMultipartUpload, UploadPart presigned with getSignedUrl from s3-request-presigner, ListParts, CompleteMultipartUpload, AbortMultipartUpload", "language": "TypeScript"})
+  ⎿  ### forRootAsync usage example
+     
+     Source: https://github.com/nestjs/bull/blob/master/_autodocs/api-reference/bullmq-module.md
+     
+     Usage example for BullModule.forRootAsync. Uses a factory to provide the Redis connection from a ConfigService, with dependency injection via the inject array. This is the standard way to set up asynchronous shared configuration for the module.
+     
+     ```ts
+     import { BullModule } from '@nestjs/bullmq';
+     import { ConfigService } from './config.service';
+     
+     @Module({
+       imports: [
+         BullModule.forRootAsync({
+           useFactory: (config: ConfigService) => ({
+             connection: config.getRedisConnection(),
+           }),
+           inject: [ConfigService],
+         }),
+       ],
+     })
+     export class AppModule {}
+     ```
+     
+     --------------------------------
+     
+     ### BullModule.registerQueue
+     
+     Source: https://github.com/nestjs/bull/blob/master/_autodocs/api-reference/bullmq-module.md
+     
+     Static factory method to register queues and their processors.
+     
+     ```APIDOC
+     ## BullModule.registerQueue
+     
+     ### Description
+     Registers a local BullMQ module with one or more queues. Each queue provider's factory creates the queue and its workers, and attaches an `onApplicationShutdown` hook to close workers, the queue, and optionally force-disconnect Redis.
+     
+     ### Method
+     static
+     
+     ### Endpoint
+     `BullModule.registerQueue(...options: RegisterQueueOptions[]): DynamicModule`
+     
+     ### Parameters
+     - `options` (RegisterQueueOptions[]) - Required (variadic) - `name`, `configKey`, `processors`, `connection`, `sharedConnection` (deprecated), `forceDisconnectOnShutdown` + any `QueueOptions` field.
+     
+     ### Returns
+     A local `DynamicModule` with option providers and queue providers. Each queue provider's factory calls `createQueueAndWorkers` which:
+     1. Creates the queue: `new queueClass(queueName, options)`.
+     2. For every `processors` entry creates a `workerClass` instance (concurrency etc. forwarded as worker options, plus `connection`, `sharedConnection`, `prefix` from the queue options).
+     3. Attaches `onApplicationShutdown`: closes all workers (`Pr … (+3107 chars)
+● mcp__context7__query-docs({"libraryId": "/aws/aws-sdk-js-v3", "query": "presigned GetObjectCommand with ResponseContentDisposition attachment and expiresIn; HeadObjectCommand ContentLength; PutObjectCommand thumbnail; DeleteObjects; PutBucketCors ExposeHeaders ETag; PutBucketLifecycleConfiguration AbortIncompleteMultipartUpload", "language": "TypeScript"})
+  ⎿  ### Generate presigned URL using S3Client and GetObjectCommand
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/packages/s3-request-presigner/README.md
+     
+     Generates a presigned URL for an S3 operation using a client and command. The expiresIn configuration defaults to 900 seconds if not explicitly provided.
+     
+     ```javascript
+     import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+     import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+     const client = new S3Client(clientParams);
+     const command = new GetObjectCommand(getObjectParams);
+     const url = await getSignedUrl(client, command, { expiresIn: 3600 });
+     ```
+     
+     --------------------------------
+     
+     ### UploadPartCommand: sending each part and collecting its ETag
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/lib/lib-storage/src/Upload.ts
+     
+     Inside the concurrent uploader loop, each bounded part is sent via UploadPartCommand with the shared UploadId and its PartNumber. If the response is missing an ETag the upload throws, otherwise the ETag (and any returned checksums) are captured into uploadedParts, which are later submitted to CompleteMultipartUploadCommand. It also bails out early if the upload was aborted.
+     
+     ```typescript
+           this.uploadEnqueuedPartsCount += 1;
+     
+           this.__validateUploadPart(dataPart);
+     
+           const partResult = await this.client.send(
+             new UploadPartCommand({
+               ...this.params,
+               // dataPart.data is chunked into a non-streaming buffer
+               // so the ContentLength from the input should not be used for MPU.
+               ContentLength: undefined,
+               UploadId: this.uploadId,
+               Body: dataPart.data,
+               PartNumber: dataPart.partNumber,
+             })
+           );
+     
+           if (eventEmitter !== null) {
+             eventEmitter.off("xhr.upload.progress", uploadEventListener);
+           }
+     
+           if (this.abortController.signal.aborted) {
+             return;
+           }
+     
+           if (!partResult.ETag) {
+             throw new Error(
+               `Part ${dataPart.partNumber} is missi … (+2315 chars)
+● mcp__context7__query-docs({"libraryId": "/websites/ffmpeg_documentation", "query": "ffprobe -v error -print_format json -show_format -show_streams output fields; ffmpeg -ss before -i input seek single frame -frames:v 1 scale filter jpeg thumbnail; http protocol seekable reconnect options; lavfi testsrc sine to generate test clip"})
+  ⎿  ### Generate presigned URL using S3Client and GetObjectCommand
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/packages/s3-request-presigner/README.md
+     
+     Generates a presigned URL for an S3 operation using a client and command. The expiresIn configuration defaults to 900 seconds if not explicitly provided.
+     
+     ```javascript
+     import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+     import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+     const client = new S3Client(clientParams);
+     const command = new GetObjectCommand(getObjectParams);
+     const url = await getSignedUrl(client, command, { expiresIn: 3600 });
+     ```
+     
+     --------------------------------
+     
+     ### ResponseContentDisposition override for attachment download
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/clients/client-s3/src/commands/GetObjectCommand.ts
+     
+     The ResponseContentDisposition field in GetObjectRequest sets the Content-Disposition response header via ?response-content-disposition= query parameter. Per the JSDoc, these response-header-override parameters must be signed.
+     
+     ```typescript
+     /**
+      * <dt>Overriding response header values through the request</dt>
+      * <dd>
+      *    <p>There are times when you want to override certain response header values of a
+      *      <code>GetObject</code> response. For example, you might override the
+      *      <code>Content-Disposition</code> response header value through your <code>GetObject</code>
+      *    request.</p>
+      *    <p>The headers you can override using the following query parameters ...</p>
+      *    <ul>
+      *      <li><code>response-content-disposition</code></li>
+      *    </ul>
+      *    <note>
+      *      <p>When you use these parameters, you must sign the request by using either an Authorization
+      *      header or a presigned URL. These parameters cannot be used with an unsigned (anonymous)
+      *      request.</p>
+      *    </note>
+      * </dd>
+      */
+     
+     // In GetObjectRequest:
+     ResponseContentDisposition?: string | undefined;
+     ```
+     
+     --------------------------------
+     
+     ### HeadObject and DeleteOb … (+5959 chars)
+  ⎿  ### Generate test video with testsrc
+     
+     Source: https://ffmpeg.org/ffmpeg-all.html
+     
+     Generate a video with a duration of 5.3 seconds, size 176x144 (qcif), and frame rate 10 fps using the testsrc source.
+     
+     ```ffmpeg
+     testsrc=duration=5.3:size=qcif:rate=10
+     ```
+     
+     --------------------------------
+     
+     ### Generate a simple 440 Hz sine wave
+     
+     Source: https://ffmpeg.org/ffmpeg-all.html
+     
+     Use the sine filter with default options to generate a 440 Hz sine wave.
+     
+     ```text
+     sine
+     ```
+     
+     ### 39.256 thumbnail
+     
+     Source: https://ffmpeg.org/ffmpeg-all.html
+     
+     ### 39.256 thumbnail# TOC
+     Select the most representative frame in a given sequence of consecutive frames. 
+     The filter accepts the following options:  
+     
+     n
+         
+     Set the frames batch size to analyze; in a set of n frames, the filter will pick one of them, and then handle the next batch of n frames until the end. Default is `100`.  
+     
+     log
+         
+     Set the log level to display picked frame stats. Default is `info`. 
+     Since the filter keeps track of the whole frames sequence, a bigger n value will result in a higher memory usage, so a high value is not recommended. 
+     #### 39.256.1 Examples# TOC
+       * Extract one picture each 50 frames: 
+     ```
+     thumbnail=50
+     
+     ```
+     
+       * Complete example of a thumbnail creation with `ffmpeg`: 
+     ```
+     ffmpeg -i in.avi -vf thumbnail,scale=300:200 -frames:v 1 out.png
+     
+     ```
+     
+     --------------------------------
+     
+     ### 5.4 Main options
+     
+     Source: https://ffmpeg.org/ffmpeg-all.html
+     
+     -ss position (_input/output_)
+         
+     When used as an input option (before `-i`), seeks in this input file to position. Note that in most formats it is not possible to seek exactly, so `ffmpeg` will seek to the closest seek point before position. When transcoding and -accurate_seek is enabled (the default), this extra segment between the seek point and position will be decoded and discarded. When doing stream copy or when -noaccurate_seek is used, it will be preserved. 
+     When used as an output option (before an output url), decodes but discards input until the timestamps reach  … (+3206 chars)
+● mcp__context7__query-docs({"libraryId": "/taskforcesh/bullmq", "query": "stalled jobs lockDuration maxStalledCount, Redis maxmemory-policy noeviction requirement, maxRetriesPerRequest null for workers, graceful shutdown worker.close", "language": "TypeScript"})
+● mcp__context7__query-docs({"libraryId": "/websites/ffmpeg_documentation", "query": "ffprobe -show_format -show_streams -of json fields format_name duration size bit_rate, stream codec_type codec_name width height avg_frame_rate; -v error exit code on invalid input"})
+  ⎿  ### Create a Worker to Process Jobs
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/quick-start.md
+     
+     Creates a worker that processes jobs from the 'foo' queue. Uses an IORedis connection with maxRetriesPerRequest set to null. Requires a running Redis service. The worker logs the job data for each job.
+     
+     ```typescript
+     import { Worker } from 'bullmq';
+     import IORedis from 'ioredis';
+     
+     const connection = new IORedis({ maxRetriesPerRequest: null });
+     
+     const worker = new Worker(
+       'foo',
+       async job => {
+         // Will print { foo: 'bar'} for the first job
+         // and { qux: 'baz' } for the second.
+         console.log(job.data);
+       },
+       { connection },
+     );
+     ```
+     
+     --------------------------------
+     
+     ### Graceful shutdown on SIGINT and SIGTERM
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/docs/gitbook/guide/going-to-production.md
+     
+     Listens for SIGINT and SIGTERM signals to close the worker gracefully before process exit, minimizing stalled jobs. The example uses `worker.close()` and `process.exit(0)` inside a `gracefulShutdown` function. Note that this does not guarantee jobs won't stall if the job takes longer than the server's grace period.
+     
+     ```typescript
+     const gracefulShutdown = async signal => {
+       console.log(`Received ${signal}, closing server...`);
+       await worker.close();
+       // Other asynchronous closings
+       process.exit(0);
+     };
+     
+     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+     
+     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+     ```
+     
+     --------------------------------
+     
+     ### WorkerOptions interface defaults
+     
+     Source: https://github.com/taskforcesh/bullmq/blob/master/src/interfaces/worker-options.ts
+     
+     The WorkerOptions interface documents the default values for drainDelay (5 seconds), stalledInterval (30000ms), maxStalledCount (1), and lockDuration (30000ms).
+     
+     ```typescript
+       /**
+        * Number of seconds to long poll for jobs when the queue is empty.
+        *
+        * @defaultValue 5
+        */
+       drainDelay?: number;
+     
+       /**
+        * Amount of times a job can be rec … (+1978 chars)
+● mcp__context7__query-docs({"libraryId": "/aws/aws-sdk-js-v3", "query": "CreateMultipartUploadCommand ContentType, ListPartsCommand pagination PartNumberMarker, CompleteMultipartUploadCommand MultipartUpload Parts ETag PartNumber, AbortMultipartUploadCommand, ListMultipartUploads, S3ServiceException NoSuchKey NoSuchUpload error handling", "language": "TypeScript"})
+  ⎿  ### 19 Format Options
+     
+     Source: https://ffmpeg.org/ffmpeg-all.html
+     
+     dump_separator string (_input_)
+         
+     Separator used to separate the fields printed on the command line about the Stream parameters. For example, to separate the fields with newlines and indentation: 
+     ```
+     ffprobe -dump_separator "
+                               "  -i ~/videos/matrixbench_mpeg2.mpg
+     
+     ```
+     
+     --------------------------------
+     
+     ### 5.11 Advanced options
+     
+     Source: https://ffmpeg.org/ffmpeg-all.html
+     
+     -xerror (_global_)
+         
+     Stop and exit on error
+  ⎿  ### Perform multipart upload with Upload class
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/lib/lib-storage/README.md
+     
+     Uploads buffers, blobs, or streams to Amazon S3 using concurrent multipart uploads with progress tracking. Configurable options include queueSize, minimum 5MB partSize, tags, and whether to leave parts on error.
+     
+     ```js
+     import { Upload } from "@aws-sdk/lib-storage";
+     import { S3Client, S3 } from "@aws-sdk/client-s3";
+     
+     try {
+       const parallelUploads3 = new Upload({
+         client: new S3({}) || new S3Client({}),
+         params: { Bucket, Key, Body },
+     
+         // optional tags
+         tags: [/*...*/],
+     
+         // additional optional fields show default values below:
+     
+         // (optional) concurrency configuration
+         queueSize: 4,
+     
+         // (optional) size of each part, in bytes, at least 5MB
+         partSize: 1024 * 1024 * 5,
+     
+         // (optional) when true, do not automatically call AbortMultipartUpload when
+         // a multipart upload fails to complete. You should then manually handle
+         // the leftover parts.
+         leavePartsOnError: false,
+       });
+     
+       parallelUploads3.on("httpUploadProgress", (progress) => {
+         console.log(progress);
+       });
+     
+       await parallelUploads3.done();
+     } catch (e) {
+       console.log(e);
+     }
+     ```
+     
+     --------------------------------
+     
+     ### UploadPartCommand: sending each part and collecting its ETag
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/lib/lib-storage/src/Upload.ts
+     
+     Inside the concurrent uploader loop, each bounded part is sent via UploadPartCommand with the shared UploadId and its PartNumber. If the response is missing an ETag the upload throws, otherwise the ETag (and any returned checksums) are captured into uploadedParts, which are later submitted to CompleteMultipartUploadCommand. It also bails out early if the upload was aborted.
+     
+     ```typescript
+           this.uploadEnqueuedPartsCount += 1;
+     
+           this.__validateUploadPart(dataPart);
+     
+           const partResult = await this.client.send(
+             new UploadPartCommand({
+               ...this.params,
+            … (+7006 chars)
+● mcp__context7__query-docs({"libraryId": "/aws/aws-sdk-js-v3", "query": "requestChecksumCalculation WHEN_REQUIRED responseChecksumValidation, presigned URL includes x-amz-checksum-crc32 / x-amz-sdk-checksum-algorithm breaking browser uploads or third-party S3-compatible (MinIO)", "language": "TypeScript"})
+● mcp__context7__resolve-library-id({"libraryName": "ioredis", "query": "ioredis connection options host port maxRetriesPerRequest null for BullMQ"})
+  ⎿  ### PutObjectCommand config: requestChecksumRequired is false, but requestAlgorithmMember is modeled
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/clients/client-s3/src/commandBuilder.ts
+     
+     PutObjectCommand uses middleware group _mw11 which has requestChecksumRequired: false but defines requestAlgorithmMember pointing ChecksumAlgorithm to x-amz-sdk-checksum-algorithm. Combined with the DEFAULT_REQUEST_CHECKSUM_CALCULATION = WHEN_SUPPORTED, the flexibleChecksumsMiddleware sets CRC32 as the algorithm, adds the x-amz-sdk-checksum-algorithm header, computes the CRC32 of the body (even empty), and adds x-amz-checksum-crc32. Setting requestChecksumCalculation to WHEN_REQUIRED eliminates these headers for PutObject.
+     
+     ```typescript
+     export const _mw11 = (Command: any, cs: any, config: any, o: any) => [
+       getFlexibleChecksumsPlugin(config, {
+         requestAlgorithmMember: { "httpHeader": "x-amz-sdk-checksum-algorithm", "name": "ChecksumAlgorithm", },
+         requestChecksumRequired: false,
+       }),
+       getCheckContentLengthHeaderPlugin(config),
+       getThrow200ExceptionsPlugin(config),
+       getSsecPlugin(config),
+     ];
+     ```
+     
+     --------------------------------
+     
+     ### WHEN_SUPPORTED is the default, automatically adding checksums for all modeled httpChecksum operations
+     
+     Source: https://github.com/aws/aws-sdk-js-v3/blob/main/packages-internal/checksums/src/submodules/flexible-checksums/constants.ts
+     
+     RequestChecksumCalculation enum and its default. WHEN_SUPPORTED causes checksum headers to be added for all operations with a requestAlgorithmMember (like PutObject), even if requestChecksumRequired is false. WHEN_REQUIRED only adds checksums when requestChecksumRequired is true or the user explicitly sets ChecksumAlgorithm.
+     
+     ```typescript
+     export const RequestChecksumCalculation = {
+       WHEN_SUPPORTED: "WHEN_SUPPORTED",
+       WHEN_REQUIRED: "WHEN_REQUIRED",
+     } as const;
+     
+     export const DEFAULT_REQUEST_CHECKSUM_CALCULATION = RequestChecksumCalculation.WHEN_SUPPORTED;
+     ```
+     
+     --------------------------------
+     
+     ### En … (+3674 chars)
+  ⎿  Available Libraries:
+     
+     - Title: ioredis
+     - Context7-compatible library ID: /redis/ioredis
+     - Description: ioredis is a robust, performance-focused, and full-featured Redis client for Node.js, supporting features like Cluster, Sentinel, Streams, Pipelining, and Lua scripting.
+     - Code Snippets: 10185
+     - Source Reputation: High
+     - Benchmark Score: 79.25
+     - Versions: v5_4_0, v6.0.0
+     ----------
+     - Title: ioredis
+     - Context7-compatible library ID: /websites/redis_github_io_ioredis
+     - Description: ioredis is a robust, full-featured Redis and Redis Cluster client for Node.js that supports Sentinel, pipelining, transactions, and streams.
+     - Code Snippets: 130
+     - Source Reputation: High
+     - Benchmark Score: 52
+● mcp__context7__query-docs({"libraryId": "/redis/ioredis/v6.0.0", "query": "ioredis v6 breaking changes from v5, constructor options host port password maxRetriesPerRequest, quit/disconnect, TypeScript import", "language": "TypeScript"})
+  ⎿  ### `protocol` option default changed to 3
+     
+     Source: https://github.com/redis/ioredis/blob/main/lib/redis/RedisOptions.ts
+     
+     The `protocol` option in RedisOptions now defaults to `3` (RESP3) instead of the v5 default of `2`. The JSDoc documents the default and the `DEFAULT_REDIS_OPTIONS` object sets it to `3`.
+     
+     ```typescript
+       /**
+        * The RESP protocol version to use.
+        * @default 3
+        */
+       protocol?: ProtocolVersion | undefined;
+     ```
+     
+     --------------------------------
+     
+     ### lazyConnect, enableOfflineQueue, connectTimeout options
+     
+     Source: https://github.com/redis/ioredis/blob/main/lib/redis/RedisOptions.ts
+     
+     `lazyConnect` delays connection until the first command (or explicit `.connect()`). `enableOfflineQueue` buffers commands when the stream isn't writable. `connectTimeout` (default 10000ms) kills the socket on inactivity during initial connection. `maxRetriesPerRequest` limits offline queue retries before flushing with error.
+     
+     ```typescript
+       /**
+        * How long the client will wait before killing a socket due to inactivity during initial connection.
+        * @default 10000
+        */
+       connectTimeout?: number | undefined;
+     
+       /**
+        * @default 20
+        */
+       maxRetriesPerRequest?: number | null | undefined;
+     
+       offlineQueue?: boolean | undefined;
+       commandQueue?: boolean | undefined;
+     
+       /**
+        * By default, if the connection to Redis server has not been established, commands are added to a queue
+        * and are executed once the connection is "ready"... If this option is false, when execute the command
+        * when the connection isn't ready, an error will be returned.
+        * @default true
+        */
+       enableOfflineQueue?: boolean | undefined;
+     
+       /**
+        * When a Redis instance is initialized, a connection to the server is immediately established. Set this to
+        * true will delay the connection to the server until the first command is sent or `redis.connect()` is called
+        * explicitly.
+        * @default false
+        */
+       lazyConnect?: boolean | undefined;
+     ```
+     
+     --------------------------------
+     
+     ### quit/d … (+3136 chars)
+● Now I'm writing the decisions into the decisions doc.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● All 15 decisions are filled in. Next I'm updating the frontmatter status and the summary table.
+● Bash(grep -n 'status: \(pending\|decided\|partial\)\|^status' .claude/skills/research/SKILL.md | head; grep -c '_\[pending\]_' docs/decisions/technical-decisions-phase-03-videos.md; grep -n '^status' docs/decisions/*.md)
+  ⎿  232:status: pending                                      # pending | decided
+     15
+     docs/decisions/technical-decisions-next-frontend-config-base.md:4:status: decided
+     docs/decisions/technical-decisions-next-frontend-msw-foundation.md:4:status: decided
+     docs/decisions/technical-decisions-next-frontend-openapi-typing.md:4:status: decided
+     docs/decisions/technical-decisions-openapi-docs-nestjs.md:4:status: decided
+     docs/decisions/technical-decisions-phase-01-configuracao-base.md:4:status: decided
+     docs/decisions/technical-decisions-phase-02-auth-frontend.md:4:status: decided
+     docs/decisions/technical-decisions-phase-02-auth.md:4:status: decided
+     docs/decisions/technical-decisions-phase-03-videos.md:4:status: pending
+● Bash(python3 - <<'EOF'
+p='docs/decisions/technical-decisions-phase-03-videos.md'
+s=open(p).read()
+s=s.replace('related_phases: [3]\nstatus: pending\n','related_phases: [3]\nstatus: decided\n',1)
+choices={'TD-01':'A','TD-02':'A','TD-03':'A','TD-04':'B (fork `pgsty/minio`; diverges)','TD-05':'A','TD-06':'A','TD-07':'A','TD-08':'A','TD-09':'A','TD-10':'A (single enum; diverges)','TD-11':'A','TD-12':'A','TD-13':'B','TD-14':'A','TD-15':'A'}
+out=[]
+for line in s.split('\n'):
+    for td,c in choices.items():
+        if line.startswith(f'| {td} |') and line.endswith('| _[pending]_ |'):
+            line=lin … (+327 chars))
+  ⎿  0
+     ## Decisions Summary
+     
+     | ID | Scope | Decision | Recommendation | Choice |
+     |----|-------|----------|---------------|--------|
+     | TD-01 | Backend | Message Queue Technology | BullMQ on Redis (`@nestjs/bullmq`) | A |
+     | TD-02 | Backend | Video Worker Runtime Topology | Same codebase, separate entrypoint + Compose service | A |
+     | TD-03 | Backend | S3 Client Library | AWS SDK v3 (`client-s3` + `s3-request-presigner`) | A |
+     | TD-04 | Repo-wide | Local S3-Compatible Image Sourcing (MinIO) | Pin last official `quay.io/minio/minio` tag (fork as fallback) | B (fork `pgsty/minio`; diverges) |
+     | TD-05 | Backend | Storage Endpoint Topology for Presigned URLs | Dual endpoint (`S3_ENDPOINT` internal + `S3_PUBLIC_ENDPOINT`) | A |
+     | TD-06 | Backend | Bucket and Object Key Layout | Single private bucket, `videos/{videoId}/…` | A |
+     | TD-07 | Cross-layer | Large Upload Protocol | S3 multipart with presigned part URLs, API-orchestrated | A |
+     | TD-08 | Backend | Upload Completion Detection and Processing Trigger | API-driven completion endpoint | A |
+     | TD-09 | Backend | Accepted Input Formats and Playback Compatibility | Allowlist browser-playable formats, validated at API + worker | A |
+     | TD-10 | Backend | Video Status Lifecycle Model | Two orthogonal fields (processing + publication) | A (single enum; diverges) |
+     | TD-11 | Backend | FFmpeg/ffprobe Integration Approach | Distro FFmpeg in worker image + thin `child_process` wrapper | A |
+     | TD-12 | Backend | Worker Access to the Source Video | Ranged remote read via presigned GET | A |
+     | TD-13 | Backend | Processing Failure, Retry, and Abandoned-Upload Cleanup | Queue retries + permanent/transient split + reconciliation sweep | B |
+     | TD-14 | Cross-layer | Unique Public Video Identifier | Random 11-char base64url slug + unique index | A |
+     | TD-15 | Cross-layer | Streaming and Download Delivery | Private bucket + presigned GET (Range/206 native) | A |
+     ---
+     scope_type: phase
+     related_phases: [3]
+     status: decided
+     date: 2026-10-15
+● The decisions doc is done. Now I'm dispatching the two decisions readers to regenerate the context.md index and detail sections.
+● Agent(decisions-reader: Decisions index post-resolve)
+  ⎿  Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)
+     agentId: a98fcce057b930c22 (internal ID - do not mention to user. Use SendMessage with to: 'a98fcce057b930c22', summary: '<5-10 word recap>' to continue this agent.)
+     The agent is working in the background. You will be notified automatically when it completes. You know nothing about its results until that notification arrives — do not report, assume, or predict them; continue other work or respond to the user in the meantime.
+     Do not duplicate this agent's work — avoid working with the same files or topics it is using.
+     output_file: /private/tmp/claude-501/-Users-ricardorauberpereira-Downloads-MBA-Desafios-Upload-Processamento-Videos-StreamTube/5f0ea033-a935-4bc8-a854-537d65fb6b20/tasks/a98fcce057b930c22.output
+     Do NOT Read or tail this file via the shell tool — it is the full subagent JSONL transcript and reading it will overflow your context. If the user asks for progress, say the agent is still running; you'll get a completion notification.
+● Agent(decisions-detail-reader: Decisions detail post-resolve)
+  ⎿  Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing reply.)
+     agentId: a79e24558e11051b7 (internal ID - do not mention to user. Use SendMessage with to: 'a79e24558e11051b7', summary: '<5-10 word recap>' to continue this agent.)
+     The agent is working in the background. You will be notified automatically when it completes. You know nothing about its results until that notification arrives — do not report, assume, or predict them; continue other work or respond to the user in the meantime.
+     Do not duplicate this agent's work — avoid working with the same files or topics it is using.
+     output_file: /private/tmp/claude-501/-Users-ricardorauberpereira-Downloads-MBA-Desafios-Upload-Processamento-Videos-StreamTube/5f0ea033-a935-4bc8-a854-537d65fb6b20/tasks/a79e24558e11051b7.output
+     Do NOT Read or tail this file via the shell tool — it is the full subagent JSONL transcript and reading it will overflow your context. If the user asks for progress, say the agent is still running; you'll get a completion notification.
+● Bash(grep -n -A4 '^## Non-UI / Deferred Capabilities' docs/phases/phase-02-auth-frontend/context.md docs/phases/phase-02-auth/context.md | head -20)
+  ⎿  docs/phases/phase-02-auth-frontend/context.md:276:## Non-UI / Deferred Capabilities
+     docs/phases/phase-02-auth-frontend/context.md-277-
+     docs/phases/phase-02-auth-frontend/context.md-278-| Capability | Status | Rationale | TD refs |
+     docs/phases/phase-02-auth-frontend/context.md-279-|-----------|--------|-----------|---------|
+     docs/phases/phase-02-auth-frontend/context.md-280-| "Confirmação de conta via e-mail com link de ativação" | deferred | deferred_to_next_phase — UI landing screen de-scoped 2026-05-14; FE confirmation flow (TD-07) picked up by a future phase. BE side unchanged in `phase-02-auth`. | phase-02-auth-frontend/TD-07 |
+     --
+     docs/phases/phase-02-auth/context.md:177:## Non-UI / Deferred Capabilities
+     docs/phases/phase-02-auth/context.md-178-
+     docs/phases/phase-02-auth/context.md-179-| Capability | Status | Rationale | TD refs |
+     docs/phases/phase-02-auth/context.md-180-|------------|--------|-----------|---------|
+     docs/phases/phase-02-auth/context.md-181-| Telas de cadastro, login, confirmação de conta e recuperação de senha | deferred | `next-frontend/` is not initialized in this phase; UI surfaces start in a later phase. | — |
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● The context.md deferred rows are in. Now I'm rewriting validation.md to mark all 19 issues resolved.
+● Write(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md (8170 chars))
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Write(/private/tmp/claude-501/-Users-ricardorauberpereira-Downloads-MBA-Desafios-Upload-Processamento-Videos-StreamTube/5f0ea033-a935-4bc8-a854-537d65fb6b20/scratchpad/detail.md (4606 chars))
+  ⎿  File created successfully at: /private/tmp/claude-501/-Users-ricardorauberpereira-Downloads-MBA-Desafios-Upload-Processamento-Videos-StreamTube/5f0ea033-a935-4bc8-a854-537d65fb6b20/scratchpad/detail.md (file state is current in your context — no need to Read it back)
+● Bash(SP=/private/tmp/claude-501/-Users-ricardorauberpereira-Downloads-MBA-Desafios-Upload-Processamento-Videos-StreamTube/5f0ea033-a935-4bc8-a854-537d65fb6b20/scratchpad && python3 - "$SP/detail.md" <<'EOF'
+import re,sys
+doc=open('docs/decisions/technical-decisions-phase-03-videos.md').read()
+# extract notes per TD
+notes={}
+for m in re.finditer(r'^## (TD-\d+):.*?(?=^---$)', doc, re.M|re.S):
+    block=m.group(0)
+    lib=re.search(r'^\*\*Libraries:\*\*.*$', block, re.M)
+    tail=block[lib.end():].strip()
+    if tail: notes[m.group(1)]=tail
+detail=open(sys.argv[1]).read().rstrip('\n')
+for td,n in note … (+2215 chars))
+  ⎿  notes ['TD-01', 'TD-02', 'TD-03', 'TD-04', 'TD-05', 'TD-07', 'TD-09', 'TD-10', 'TD-11', 'TD-15'] rows 15
+     16:## Scope
+     47:## Decisions Index
+     71:## Capability Coverage
+     85:## Decisions Detail
+     87:### phase-03-videos/TD-01
+     92:**Note:** Exact pins checked on 2026-10-15: `@nestjs/bullmq@12.0.0` (peers: `@nestjs/common`/`@nestjs/core` `^10 || ^11 || ^12`, `bullmq` `^3 … ^6`, compatible with the installed `@nestjs/core` 11.1.16), `bullmq@6.3.15`, `ioredis@6.0.0`. Since BullMQ 6, `ioredis` is an optional peer dependency that must be installed explicitly; ioredis 6 requires Node ≥ 20 and defaults to RESP3. Redis runs as a `redis` Compose service (`redis:8.10.2-alpine`) with `maxmemory-policy noeviction`; the API and worker reach it by its service name.
+     94:### phase-03-videos/TD-02
+     99:**Note:** In dev, `nestjs-api` and `video-worker` share the `Dockerfile.dev` image (`node:25.6.0-slim`, Debian 12 bookworm), and FFmpeg is installed in that image (`apt install ffmpeg`; Debian candidate `7:5.1.9-0+deb12u1`). Reason: the full Jest suite (unit + integration + e2e) runs inside the `nestjs-api` container, and the worker integration tests need real `ffprobe`/`ffmpeg` and generate fixture clips with ffmpeg's `lavfi` `testsrc`. This overrides the option's "worker image adds FFmpeg" wording for the dev image. Splitting the API and worker images for production stays possible later.
+     101:### phase-03-videos/TD-03
+     106:**Note:** Exact pins checked on 2026-10-15: `@aws-sdk/client-s3@3.1152.0` and `@aws-sdk/s3-request-presigner@3.1152.0`. Both are always upgraded together (Node ≥ 20 engine).
+     108:### phase-03-videos/TD-04
+     113:**Note:** The decision deliberately diverges from the Recommendation. On 2026-10-15, `docker manifest inspect` and `docker pull` showed that `minio/minio` and `quay.io/minio/minio` (including `RELEASE.2025-09-07T16-13-09Z` and `latest`), and `minio/mc` / `quay.io/minio/mc`, can no longer be pulled ("unauthorized" / "repository does not exist"). Pins: `pgsty/minio:RELEASE.2026 … (+3319 chars)
+● The context.md index and detail are rewritten. Now I'm writing library-refs.md from the Context7 material.
+● Bash(sed -n 1,15p docs/phases/phase-02-auth-frontend/context.md; grep -n 'library-refs' .claude/skills/plan-build/SKILL.md | head -12)
+  ⎿  ---
+     kind: phase
+     name: phase-02-auth-frontend
+     sources_mtime:
+       docs/project-plan.md: "2026-05-12T13:48:56-03:00"
+       docs/decisions/technical-decisions-phase-02-auth-frontend.md: "2026-05-14T11:03:30-03:00"
+       docs/decisions/technical-decisions-next-frontend-config-base.md: "2026-05-13T15:23:15-03:00"
+       docs/decisions/technical-decisions-next-frontend-msw-foundation.md: "2026-05-14T09:31:19-03:00"
+       docs/decisions/technical-decisions-next-frontend-openapi-typing.md: "2026-05-13T19:51:13-03:00"
+       docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-05-12T16:17:52-03:00"
+       docs/phases/phase-01-configuracao-base/context.md: "2026-05-12T14:01:06-03:00"
+       .claude/skills/testing-guide-next-frontend/SKILL.md: "2026-05-13T10:59:26-03:00"
+       docs/inventories/screen-inventory-phase-02-auth-frontend.md: "2026-05-14T10:00:23-03:00"
+     ---
+     
+     3:description: "Stage 4 of the plan pipeline (phase and task modes). Runs abort-fast preflight checks (mode detection, context.md + validation.md present and fresh, status clean, library-refs.md present if required, resume detection) and writes the final phase-NN-{slug}.md or task-{slug}.md artifact directly from the main thread. The procedure is split across companion files: phase-a.md (scaffold + Technical Specifications + pause), phase-b.md (Step Implementations + Dependency Map + Deliverables), phase-c.md (append-mode for incremental delta builds). The pause between Phase A and Phase B creates a natural review checkpoint. Use as the final stage after validation.md reports clean. Triggers: 'plan-build NN', 'plan-build <slug>', 'build the phase NN', 'build task <slug>'."
+     37:Run in order. Every check is O(1) or bounded; no full reads of `context.md`, `library-refs.md`, or decisions docs happen here. Any failed gate aborts immediately with an actionable next-command, never falls through.
+     70:### Gate 7 — library-refs requirement (targeted grep)
+     78:- **≥1 match** AND `{target_dir}/library-refs.md` missing → abort: `"Libraries are decided in … (+2882 chars)
+● Bash(date +%Y-%m-%dT%H:%M:%S%z | sed -E 's/([0-9]{2})([0-9]{2})$/\1:\2/'; date -r $(stat -f %m docs/decisions/technical-decisions-phase-03-videos.md) +%Y-%m-%dT%H:%M:%S%z | sed -E 's/([0-9]{2})([0-9]{2})$/\1:\2/')
+  ⎿  2026-10-15T14:12:01-03:00
+     2026-10-15T14:10:31-03:00
+● Write(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/library-refs.md (14375 chars))
+  ⎿  File created successfully at: /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/library-refs.md (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md has been updated successfully.
+● Bash(f=docs/decisions/technical-decisions-phase-03-videos.md; date -r $(stat -f %m $f) +%Y-%m-%dT%H:%M:%S%z; grep -cE '^\*\*Decision:\*\* [A-Z]' $f; grep -c 'pending' docs/phases/phase-03-videos/context.md; grep -n 'status: open' docs/phases/phase-03-videos/validation.md | wc -l; ls docs/rules/plan-resolve 2>&1 | head -1; git status --short)
+  ⎿  2026-10-15T14:10:31-0300
+     15
+     0
+            0
+     ls: docs/rules/plan-resolve: No such file or directory
+      M docs/decisions/technical-decisions-phase-03-videos.md
+      M docs/phases/phase-03-videos/context.md
+     ?? docs/phases/phase-03-videos/library-refs.md
+     ?? docs/phases/phase-03-videos/validation.md
+● I resolved all 19 open issues for phase-03-videos. Next, run `/plan-validate phase-03-videos` to reconfirm status before building. `validation.md` still says `status: dirty` with `issue_count: 0`; only `/plan-validate` sets it to clean.
+
+**Decisions** (in `docs/decisions/technical-decisions-phase-03-videos.md`, now `status: decided`)
+- **Your choices applied:** TD-01..TD-15 match your answers, including the two places you overrode the recommendation:
+  - **TD-04 → B:** the `pgsty/minio` fork, because the official MinIO images can no longer be pulled.
+  - **TD-10 → A:** a single status enum `draft → processing → ready | failed`, with a failure reason stored on `failed`.
+- **Your parameters:** each TD that came with extra details has them recorded under its decision. That covers FFmpeg in the shared dev image, the test-only `S3_PUBLIC_ENDPOINT`, the 10 GiB limit with 64 MiB parts, and the format allowlist.
+- **AMB-2/3/4:** recorded under TD-10 (channel ownership and initial fields), TD-11 (metadata columns and thumbnail rule) and TD-15 (owner-only access when `ready`, 404 for non-owners).
+- **AMB-1:** three `deferred` rows in context.md for the upload, player and download UI.
+
+**context.md**
+- The Decisions Index now shows all 15 TDs as decided, with their libraries.
+- I regenerated Decisions Detail and copied each TD's notes into it. Without them, `/plan-build` would see only the original recommendations: it would miss the TD-04/TD-10 overrides and the parameters above. This follows how the phase-02 context handled overridden decisions.
+- I also reworded a clipped TD-04 recommendation line in that section.
+
+**Versions pinned** (checked with `npm view` today)
+| Library | Version |
+|---|---|
+| `@nestjs/bullmq` | 12.0.0 (works with the installed Nest 11.1.16) |
+| `bullmq` | 6.3.15 |
+| `ioredis` | 6.0.0 |
+| `@aws-sdk/client-s3` | 3.1152.0 |
+| `@aws-sdk/s3-request-presigner` | 3.1152.0 |
+| Redis image | `redis:8.10.2-alpine` |
+| FFmpeg (Debian 12 apt, dev image) | 5.1.9 |
+
+**`library-refs.md`** is new, built from Context7 docs for the five npm libraries plus an FFmpeg/ffprobe section. Things it covers that will matter during the build:
+- **`ioredis` must be installed explicitly:** BullMQ 6 no longer brings it in, and ioredis 6 uses the newer Redis protocol (RESP3) by default.
+- **The repeating reconciliation job should use `upsertJobScheduler`,** BullMQ 6's replacement for the old repeat option.
+- **The AWS SDK's default checksums can break browser uploads to presigned URLs.** I wrote down `requestChecksumCalculation: 'WHEN_REQUIRED'` on both S3 clients as the fix. That is my reading of the docs, not something you decided, so `/plan-build` should confirm it.
+- **The fork's support for the storage cleanup rule is unconfirmed.** It's unclear whether the `pgsty/minio` fork honors the rule that aborts abandoned multipart uploads. If it doesn't, the reconciliation sweep alone covers it.
+
+Nothing is committed yet.
+
+=== result: success turns=61 cost=$3.4060534000000007 duration=453s
+
+=== session 9736371c-d19a-4efc-bbbb-ad180b3cd693 model=claude-opus-5-5 cwd=/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-pipeline/SKILL.md)
+  ⎿  1	---
+     2	name: plan-pipeline
+     3	description: "Entry point and shared conventions for the plan pipeline (phase and task modes). Invoke directly when the user asks about planning without specifying a stage — this skill orients them to the pipeline stages (context → validate → resolve → build → specs [optional]). For actual work, use the stage skills: plan-context, plan-validate, plan-resolve, plan-build, plan-test-specs."
+     4	disable-model-invocation: true
+     5	---
+     6	
+     7	# Plan Pipeline Overview
+     8	
+     9	Planning is a pipeline of up to **five stages** that works for both project phases and ad-hoc tasks. Each stage is a separate skill with one responsibility and one artifact. Stages 1-4 (context → validate → resolve → build) are the canonical happy path; Stage 5 (`/plan-test-specs`) is optional and only fires when the build emitted spec placeholders. The stages share the conventions defined below — every stage skill references this document instead of repeating them.
+     10	
+     11	```
+     12	/research [opcional em task mode]       → docs/decisions/technical-decisions-{slug}.md
+     13	/plan-context <NN | slug | "prose">     → docs/{phases|tasks}/{dir}/context.md
+     14	/plan-validate <NN | slug>              → docs/{phases|tasks}/{dir}/validation.md
+     15	/plan-resolve <NN | slug>               → edits decisions doc + context.md + validation.md + library-refs.md
+     16	/plan-validate <NN | slug>              → re-run until status: clean
+     17	/plan-build <NN | slug>                 → docs/{phases|tasks}/{dir}/{name}.md
+     18	/plan-test-specs <NN | slug>                 → <subproject>/specs/<scenario>.plan.md
+     19	```
+     20	
+     21	When the user asks generically to "plan phase NN" or "plan this task", direct them to `/plan-context <arg>` first. Each stage aborts with an explicit next-command when a precondition is missing, so the pipeline self-guides once started.
+     22	
+     23	**Alternative front-door — `/decide`.** When the user input is a free-text need rather than a structured pipeline argument (e.g., "quero mudar X", "tem de … (+32696 chars)
+● Bash(ls -la docs/phases/phase-03-videos/ docs/decisions/ docs/rules/plan-validate/ 2>&1; head -40 docs/phases/phase-03-videos/context.md)
+  ⎿  ls: docs/rules/plan-validate/: No such file or directory
+     docs/decisions/:
+     total 536
+     drwxr-xr-x@ 10 ricardorauberpereira  staff    320 Oct 15 14:10 .
+     drwxr-xr-x@ 11 ricardorauberpereira  staff    352 Oct 15 13:28 ..
+     -rw-r--r--@  1 ricardorauberpereira  staff  23003 Oct 15 13:28 technical-decisions-next-frontend-config-base.md
+     -rw-r--r--@  1 ricardorauberpereira  staff  40329 Oct 15 13:28 technical-decisions-next-frontend-msw-foundation.md
+     -rw-r--r--@  1 ricardorauberpereira  staff  39087 Oct 15 13:28 technical-decisions-next-frontend-openapi-typing.md
+     -rw-r--r--@  1 ricardorauberpereira  staff  11558 Oct 15 13:28 technical-decisions-openapi-docs-nestjs.md
+     -rw-r--r--@  1 ricardorauberpereira  staff  13261 Oct 15 13:28 technical-decisions-phase-01-configuracao-base.md
+     -rw-r--r--@  1 ricardorauberpereira  staff  56899 Oct 15 13:28 technical-decisions-phase-02-auth-frontend.md
+     -rw-r--r--@  1 ricardorauberpereira  staff  29665 Oct 15 13:28 technical-decisions-phase-02-auth.md
+     -rw-r--r--@  1 ricardorauberpereira  staff  48597 Oct 15 14:10 technical-decisions-phase-03-videos.md
+     
+     docs/phases/phase-03-videos/:
+     total 128
+     drwxr-xr-x@ 5 ricardorauberpereira  staff    160 Oct 15 14:12 .
+     drwxr-xr-x@ 6 ricardorauberpereira  staff    192 Oct 15 13:57 ..
+     -rw-r--r--@ 1 ricardorauberpereira  staff  36427 Oct 15 14:12 context.md
+     -rw-r--r--@ 1 ricardorauberpereira  staff  14405 Oct 15 14:12 library-refs.md
+     -rw-r--r--@ 1 ricardorauberpereira  staff   8282 Oct 15 14:11 validation.md
+     ---
+     kind: phase
+     name: phase-03-videos
+     sources_mtime:
+       docs/project-plan.md: "2026-10-15T13:27:03-03:00"
+       docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:10:31-03:00"
+       docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-01-configuracao-base/context.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-02-auth/context.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-02-auth-frontend/context.md: "2026-10-15T13:28:45-03:00"
+       .claude/s … (+1258 chars)
+● Bash(head -15 docs/decisions/technical-decisions-phase-03-videos.md; echo ---; for f in docs/project-plan.md docs/decisions/technical-decisions-phase-03-videos.md docs/decisions/technical-decisions-openapi-docs-nestjs.md docs/phases/phase-01-configuracao-base/context.md docs/phases/phase-02-auth/context.md docs/phases/phase-02-auth-frontend/context.md .claude/skills/testing-guide-nestjs-project/SKILL.md docs/phases/phase-03-videos/context.md; do echo "$f $(stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%S%z' $f)"; done; echo ---; grep -l '^scope_type: phase$' docs/decisions/*.md | xargs grep -lE '^related_phases … (+27 chars))
+  ⎿  ---
+     scope_type: phase
+     related_phases: [3]
+     status: decided
+     date: 2026-10-15
+     scope_description: "Backend side of Phase 03: how S3-compatible object storage is used (client lib, local MinIO image, endpoint topology, key layout), queue technology and video worker runtime, resumable 10GB direct-to-storage upload, processing trigger, FFmpeg/ffprobe metadata + thumbnail extraction, video status lifecycle and failure handling, unique public video identifier, and streaming/download delivery."
+     ---
+     
+     # Technical Decisions — Phase 03: Upload e Processamento de Vídeos
+     
+     _Subprojects in scope:_
+     
+     - `nestjs-project/` — owns every TD below: API endpoints (upload orchestration, delivery URLs), the video worker (separate Compose service), and the Compose infrastructure (object storage, queue broker). All service-to-service hosts use Compose service names (`db`, `minio`, `redis`, …).
+     - `next-frontend/` — no open decision in this document. The video UI is out of scope for this phase. The TDs marked `Cross-layer` (TD-07, TD-14, TD-15) define the HTTP contracts that the frontend will consume in later phases. Under `next-frontend-config-base/TD-03` (Strict BFF), the small JSON control-plane calls go through BFF Route Handlers. Large byte transfers go browser ↔ object storage directly through presigned URLs, as that TD already anticipated.
+     
+     ---
+     docs/project-plan.md 2026-10-15T13:27:03-0300
+     docs/decisions/technical-decisions-phase-03-videos.md 2026-10-15T14:10:31-0300
+     docs/decisions/technical-decisions-openapi-docs-nestjs.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-01-configuracao-base/context.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-02-auth/context.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-02-auth-frontend/context.md 2026-10-15T13:28:45-0300
+     .claude/skills/testing-guide-nestjs-project/SKILL.md 2026-10-15T13:27:02-0300
+     docs/phases/phase-03-videos/context.md 2026-10-15T14:12:59-0300
+     ---
+     docs/decisions/technical-decisions-phase-03-videos.md
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	status: dirty
+     5	issue_count: 0
+     6	sources_mtime:
+     7	  docs/phases/phase-03-videos/context.md: "2026-10-15T14:01:54-03:00"
+     8	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T13:56:13-03:00"
+     9	issues:
+     10	  - id: AMB-1
+     11	    status: resolved
+     12	    summary: "UI side of streaming/download/upload neither inventoried, deferred, nor Non-UI"
+     13	    resolved_by: deferred_capability
+     14	  - id: AMB-2
+     15	    status: resolved
+     16	    summary: "Draft pre-registration: owner (user vs channel) and initial fields undefined"
+     17	    resolved_by: phase-03-videos/TD-10
+     18	  - id: AMB-3
+     19	    status: resolved
+     20	    summary: "Processing outputs unspecified: which metadata fields, which thumbnail frame"
+     21	    resolved_by: phase-03-videos/TD-11
+     22	  - id: AMB-4
+     23	    status: resolved
+     24	    summary: "Stream/download access rules by viewer and video status undefined vs Phase 04"
+     25	    resolved_by: phase-03-videos/TD-15
+     26	  - id: OQ-1
+     27	    status: resolved
+     28	    summary: "TD-01 pending — Message Queue Technology"
+     29	    resolved_by: phase-03-videos/TD-01
+     30	  - id: OQ-2
+     31	    status: resolved
+     32	    summary: "TD-02 pending — Video Worker Runtime Topology"
+     33	    resolved_by: phase-03-videos/TD-02
+     34	  - id: OQ-3
+     35	    status: resolved
+     36	    summary: "TD-03 pending — S3 Client Library"
+     37	    resolved_by: phase-03-videos/TD-03
+     38	  - id: OQ-4
+     39	    status: resolved
+     40	    summary: "TD-04 pending — Local S3-Compatible Image Sourcing (MinIO)"
+     41	    resolved_by: phase-03-videos/TD-04
+     42	  - id: OQ-5
+     43	    status: resolved
+     44	    summary: "TD-05 pending — Storage Endpoint Topology for Presigned URLs"
+     45	    resolved_by: phase-03-videos/TD-05
+     46	  - id: OQ-6
+     47	    status: resolved
+     48	    summary: "TD-06 pending — Bucket and Object Key Layout"
+     49	    resolved_by: phase-03-videos/TD-06
+     50	  - id: OQ-7
+     51	    status: resolved
+     52	    summary: "TD-07 pending — Large Upload Protocol (10GB, resumable, not proxied)"
+     53	    reso … (+6690 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  40	**Sequencing notes:** "> Depende de: Fase 01, Fase 02". Intro sentence: "Upload de arquivos grandes sem travar o sistema, processamento automático do vídeo e geração de URL única."
+     41	
+     42	**Neighbors (for boundary detection only):**
+     43	
+     44	- **Phase 02:** Cadastro, Login e Gerenciamento de Conta (Depende de: Fase 01)
+     45	- **Phase 04:** Gerenciamento de Vídeos e Canal (Depende de: Fase 02, Fase 03)
+     46	
+     47	## Decisions Index
+     48	
+     49	| Ref | Source | Scope | Topic | Status | Decision | Libraries |
+     50	|-----|--------|-------|-------|--------|----------|-----------|
+     51	| phase-03-videos/TD-01 | phase | Backend | Message Queue Technology | decided | A (BullMQ on Redis via `@nestjs/bullmq`) | @nestjs/bullmq, bullmq, ioredis |
+     52	| phase-03-videos/TD-02 | phase | Backend | Video Worker Runtime Topology | decided | A (same codebase, separate worker entrypoint + `video-worker` service) | — |
+     53	| phase-03-videos/TD-03 | phase | Backend | S3 Client Library | decided | A (AWS SDK v3) | @aws-sdk/client-s3, @aws-sdk/s3-request-presigner |
+     54	| phase-03-videos/TD-04 | phase | Repo-wide | Local S3-Compatible Image Sourcing (MinIO) | decided | B (fork `pgsty/minio`; diverges from Recommendation) | — |
+     55	| phase-03-videos/TD-05 | phase | Backend | Storage Endpoint Topology for Presigned URLs | decided | A (two endpoints: `S3_ENDPOINT` + `S3_PUBLIC_ENDPOINT`) | — |
+     56	| phase-03-videos/TD-06 | phase | Backend | Bucket and Object Key Layout | decided | A (one private bucket, `videos/{videoId}/…`) | — |
+     57	| phase-03-videos/TD-07 | phase | Cross-layer | Large Upload Protocol (10GB, resumable, not proxied) | decided | A (S3 multipart with presigned part URLs) | — |
+     58	| phase-03-videos/TD-08 | phase | Backend | Upload Completion Detection and Processing Trigger | decided | A (completion endpoint on the API) | — |
+     59	| phase-03-videos/TD-09 | phase | Backend | Accepted Input Formats and Playback Compatibility | decided | A (allowlist of browser-playable formats) | — |
+     60	| phase-03-vid … (+33862 chars)
+● Bash(sed -n '1,9p;86,120p' docs/phases/phase-03-videos/validation.md >/dev/null; grep -n "^### Fase 0[34] — " docs/project-plan.md)
+  ⎿  67:### Fase 03 — Upload e Processamento de Vídeos
+     87:### Fase 04 — Gerenciamento de Vídeos e Canal
+● Write(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md (10695 chars))
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Validation for `phase-03-videos` came out **dirty**: 2 issues are still open. I rewrote `docs/phases/phase-03-videos/validation.md`. All earlier fixes (AMB-1 to 4, OQ-1 to 15) stay recorded as resolved.
+
+**Open issues**
+
+- **AMB-5: what happens to an abandoned upload.** A video is saved as a draft as soon as an upload starts. The planning context (`context.md`) doesn't say what happens if the upload is never finished. The lifecycle decision (TD-10) is `draft → processing → ready | failed` and has no path for this case. The failure-handling decision (TD-13) mentions a cleanup sweep but doesn't settle:
+  - how long a draft can sit incomplete before it counts as abandoned;
+  - whether it is then marked `failed` (with a reason) or deleted, along with its partial upload;
+  - how often the sweep runs.
+- **AMB-6: where the owner's "get one video" request belongs.** Nothing says whether this phase gives owners a way to read one video's status, failure reason, metadata and short URL (slug), or whether Phase 04 (video management) does. Without it, nobody can see through the API when processing has finished. That status is also what decides whether a stream request gets a conflict error or a redirect. Two options:
+  - add a minimal owner-only read in this phase;
+  - leave it out, have the end-to-end tests check results directly in the database, and move the read to Phase 04.
+
+**Nothing else was flagged.** All 9 capabilities in this phase are covered by at least one decision. No decision is still pending. Nothing conflicts with Phase 01/02 or with the OpenAPI docs decisions. There's no screen inventory, so the UI coverage check didn't apply. The phase has only one slice, so the cross-slice check was skipped. The planning context was up to date with every source file it was built from.
+
+Next: run `/plan-resolve phase-03-videos`, then `/plan-validate phase-03-videos` again.
+
+=== result: success turns=8 cost=$0.9959542000000001 duration=128s
+
+=== session fc3106b5-4a11-4a8e-9500-85f74b6f2b46 model=claude-opus-5-5 cwd=/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube
+● Bash(ls docs/phases/phase-03-videos/ docs/decisions/ docs/rules/plan-resolve/ 2>&1; wc -l docs/phases/phase-03-videos/*.md docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  ls: docs/rules/plan-resolve/: No such file or directory
+     docs/decisions/:
+     technical-decisions-next-frontend-config-base.md
+     technical-decisions-next-frontend-msw-foundation.md
+     technical-decisions-next-frontend-openapi-typing.md
+     technical-decisions-openapi-docs-nestjs.md
+     technical-decisions-phase-01-configuracao-base.md
+     technical-decisions-phase-02-auth-frontend.md
+     technical-decisions-phase-02-auth.md
+     technical-decisions-phase-03-videos.md
+     
+     docs/phases/phase-03-videos/:
+     context.md
+     library-refs.md
+     validation.md
+          398 docs/phases/phase-03-videos/context.md
+          206 docs/phases/phase-03-videos/library-refs.md
+          173 docs/phases/phase-03-videos/validation.md
+          542 docs/decisions/technical-decisions-phase-03-videos.md
+         1319 total
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	status: dirty
+     5	issue_count: 2
+     6	sources_mtime:
+     7	  docs/phases/phase-03-videos/context.md: "2026-10-15T14:12:59-03:00"
+     8	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:10:31-03:00"
+     9	issues:
+     10	  - id: AMB-1
+     11	    status: resolved
+     12	    summary: "UI side of streaming/download/upload neither inventoried, deferred, nor Non-UI"
+     13	    resolved_by: deferred_capability
+     14	  - id: AMB-2
+     15	    status: resolved
+     16	    summary: "Draft pre-registration: owner (user vs channel) and initial fields undefined"
+     17	    resolved_by: phase-03-videos/TD-10
+     18	  - id: AMB-3
+     19	    status: resolved
+     20	    summary: "Processing outputs unspecified: which metadata fields, which thumbnail frame"
+     21	    resolved_by: phase-03-videos/TD-11
+     22	  - id: AMB-4
+     23	    status: resolved
+     24	    summary: "Stream/download access rules by viewer and video status undefined vs Phase 04"
+     25	    resolved_by: phase-03-videos/TD-15
+     26	  - id: AMB-5
+     27	    status: open
+     28	    summary: "Abandoned draft uploads: threshold and terminal outcome (failed vs delete) undefined"
+     29	  - id: AMB-6
+     30	    status: open
+     31	    summary: "Owner read of video status/metadata/slug: Phase 03 endpoint or Phase 04?"
+     32	  - id: OQ-1
+     33	    status: resolved
+     34	    summary: "TD-01 pending — Message Queue Technology"
+     35	    resolved_by: phase-03-videos/TD-01
+     36	  - id: OQ-2
+     37	    status: resolved
+     38	    summary: "TD-02 pending — Video Worker Runtime Topology"
+     39	    resolved_by: phase-03-videos/TD-02
+     40	  - id: OQ-3
+     41	    status: resolved
+     42	    summary: "TD-03 pending — S3 Client Library"
+     43	    resolved_by: phase-03-videos/TD-03
+     44	  - id: OQ-4
+     45	    status: resolved
+     46	    summary: "TD-04 pending — Local S3-Compatible Image Sourcing (MinIO)"
+     47	    resolved_by: phase-03-videos/TD-04
+     48	  - id: OQ-5
+     49	    status: resolved
+     50	    summary: "TD-05 pending — Storage Endpoint Topology for Presigned URLs"
+     51	    resolved_by: phase-03-videos/TD-05
+     52	  - id: OQ-6 … (+9283 chars)
+● Bash(for f in docs/phases/phase-03-videos/context.md docs/decisions/technical-decisions-phase-03-videos.md docs/phases/phase-03-videos/library-refs.md; do echo "$f $(date -r $(stat -f %m $f) +%Y-%m-%dT%H:%M:%S%z)"; done; date +%F; head -40 docs/phases/phase-03-videos/context.md; grep -n '^## \|^### TD-' docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  docs/phases/phase-03-videos/context.md 2026-10-15T14:12:59-0300
+     docs/decisions/technical-decisions-phase-03-videos.md 2026-10-15T14:10:31-0300
+     docs/phases/phase-03-videos/library-refs.md 2026-10-15T14:12:55-0300
+     2026-10-15
+     ---
+     kind: phase
+     name: phase-03-videos
+     sources_mtime:
+       docs/project-plan.md: "2026-10-15T13:27:03-03:00"
+       docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:10:31-03:00"
+       docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-01-configuracao-base/context.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-02-auth/context.md: "2026-10-15T13:28:45-03:00"
+       docs/phases/phase-02-auth-frontend/context.md: "2026-10-15T13:28:45-03:00"
+       .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-10-15T13:27:02-03:00"
+     ---
+     
+     # phase-03-videos — Context
+     
+     ## Scope
+     
+     **Phase name:** Fase 03 — Upload e Processamento de Vídeos
+     
+     **Capabilities** (literal, `docs/project-plan.md`):
+     
+     - Serviço de armazenamento de arquivos (vídeos e thumbnails)
+     - Serviço de processamento em segundo plano (filas)
+     - Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+     - Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+     - Processamento automático do vídeo após upload (extração de duração e metadados)
+     - Geração automática de thumbnail a partir de um frame do vídeo
+     - URL única por vídeo, sem conflito com outros vídeos
+     - Reprodução via streaming (sem necessidade de download completo)
+     - Download do vídeo pelo usuário
+     
+     **Out of scope:** _Not specified._
+     
+     **Deliverables:** upload de até 10GB funcional, processamento automático do vídeo, streaming funcionando, URLs únicas geradas.
+     
+     **Affected subprojects:** _None named explicitly for this phase in project-plan.md._
+     
+     **Deferred subprojects:** _None._
+     
+     **Sequencing notes:** "> Depende de: Fase 01, Fase 02". Intro sentence: "Upload de arquivos grandes sem travar o sistema, processamento automático do vídeo e geração de URL única."
+     22 … (+887 chars)
+● Sources are fresh (no drift). Reading the target TD ranges.
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  309	## TD-10: Video Status Lifecycle Model
+     310	
+     311	**Scope:** Backend
+     312	
+     313	**Capability:** Transversal — covers: "Pré-cadastro automático do vídeo como rascunho ao iniciar o upload", "Processamento automático do vídeo após upload (extração de duração e metadados)"
+     314	
+     315	**Context:** Phase 03 creates the video "como rascunho" when the upload starts and drives it through processing. Phase 04 owns the "Fluxo de rascunho → publicação" and shows a status column in the channel panel. Two concerns overlap here: whether the file is processed, and whether the video is published. The status values are exposed in API responses and flow to the frontend through the OpenAPI contract. Depends on TD-08 and TD-13.
+     316	
+     317	**Options:**
+     318	
+     319	### Option A: Single status enum
+     320	- One `status` column: `draft` (uploading) → `processing` → `ready` | `failed`. Phase 04 extends the same enum (e.g., `published`).
+     321	- **Pros:** One column, one state machine, and it matches the brief's wording. Simple queries.
+     322	- **Cons:** It conflates two independent axes. A `ready` video is still a draft for publication purposes, and Phase 04 must add states (or a second column anyway) to express "processed but unpublished" versus "published". The meaning of `draft` changes between phases.
+     323	
+     324	### Option B: Two orthogonal fields — processing state and publication state
+     325	- `processing_status`: `uploading` → `processing` → `ready` | `failed`, plus a failure reason. A publication field defaults to `draft` in Phase 03. Phase 04 adds the publish transition and the guard "publish only when `ready`".
+     326	- **Pros:** "Pré-cadastro como rascunho" maps literally to the publication default. Phase 04 extends its own axis without changing Phase 03's state machine. Each transition has one owner (API/worker for processing, the user for publication).
+     327	- **Cons:** Two columns, and combinations must be guarded (e.g., no publishing while `processing`). The panel must combine both fields for displa … (+1376 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  417	## TD-13: Processing Failure, Retry, and Abandoned-Upload Cleanup Policy
+     418	
+     419	**Scope:** Backend
+     420	
+     421	**Capability:** Transversal — covers: "Serviço de processamento em segundo plano (filas)", "Processamento automático do vídeo após upload (extração de duração e metadados)", "Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance"
+     422	
+     423	**Context:** Failures fall into three groups:
+     424	- transient errors (storage/network hiccups, worker crash mid-job);
+     425	- permanent errors (corrupt file, unsupported codec per TD-09);
+     426	- abandoned uploads (the client never completes, leaving orphan multipart parts that cost storage).
+     427	
+     428	There is also the dual-write gap between the DB status update and enqueueing (TD-01 Option A). The policy spans the queue, the DB status (TD-10), the worker and storage. Depends on TD-01, TD-08 and TD-10.
+     429	
+     430	**Options:**
+     431	
+     432	### Option A: Queue-native retries + terminal `failed`; storage lifecycle rule for abandoned parts
+     433	- Jobs get N attempts with exponential backoff. Permanent errors skip retries (BullMQ `UnrecoverableError` / pg-boss equivalent) and set `failed` with a reason. Incomplete multipart uploads are aborted by an `AbortIncompleteMultipartUpload` lifecycle rule (N days).
+     434	- **Pros:** Mostly configuration, little code. Handles transient and permanent errors distinctly.
+     435	- **Cons:** No safety net for the dual-write gap or for a missed `complete` callback. Rows can stay in `uploading`/`processing` forever. The lifecycle rule cleans storage but leaves orphan draft rows.
+     436	
+     437	### Option B: Option A + application-level reconciliation sweep
+     438	- Adds a scheduled job (e.g., a repeatable queue job) that re-enqueues videos stuck in `processing` beyond a threshold. It also aborts the multipart upload and marks the video `failed` (or deletes the draft) for videos in `uploading` past a TTL.
+     439	- **Pros:** Closes the dual-write gap and the missed-callback case. DB and storage c … (+9165 chars)
+● Bash(grep -n '^## \|^### ' docs/phases/phase-03-videos/context.md; grep -n 'videos/:\|/videos\|upsertJobScheduler\|JobScheduler\|repeat' docs/phases/phase-03-videos/context.md docs/phases/phase-03-videos/library-refs.md | head -30; sed -n 1,25p docs/phases/phase-03-videos/library-refs.md)
+  ⎿  16:## Scope
+     47:## Decisions Index
+     71:## Capability Coverage
+     85:## Decisions Detail
+     87:### phase-03-videos/TD-01
+     94:### phase-03-videos/TD-02
+     101:### phase-03-videos/TD-03
+     108:### phase-03-videos/TD-04
+     115:### phase-03-videos/TD-05
+     122:### phase-03-videos/TD-06
+     127:### phase-03-videos/TD-07
+     134:### phase-03-videos/TD-08
+     139:### phase-03-videos/TD-09
+     146:### phase-03-videos/TD-10
+     161:### phase-03-videos/TD-11
+     173:### phase-03-videos/TD-12
+     178:### phase-03-videos/TD-13
+     183:### phase-03-videos/TD-14
+     188:### phase-03-videos/TD-15
+     199:## Inherited Decisions Detail
+     201:### phase-01-configuracao-base/TD-01
+     207:### phase-01-configuracao-base/TD-02
+     213:### phase-01-configuracao-base/TD-03
+     219:### phase-01-configuracao-base/TD-04
+     225:### phase-02-auth/TD-01
+     231:### phase-02-auth/TD-02
+     239:### phase-02-auth/TD-03
+     245:### phase-02-auth/TD-04
+     251:### phase-02-auth/TD-05
+     257:### phase-02-auth/TD-06
+     263:### phase-02-auth/TD-07
+     269:### phase-02-auth/TD-08
+     275:### phase-02-auth/TD-09
+     283:### phase-02-auth/TD-10
+     289:### phase-02-auth-frontend/TD-01
+     294:### phase-02-auth-frontend/TD-02
+     299:### phase-02-auth-frontend/TD-03
+     304:### phase-02-auth-frontend/TD-04
+     309:### phase-02-auth-frontend/TD-05
+     314:### phase-02-auth-frontend/TD-06
+     319:### phase-02-auth-frontend/TD-07
+     324:### openapi-docs-nestjs/TD-01
+     334:### openapi-docs-nestjs/TD-02
+     340:### openapi-docs-nestjs/TD-03
+     346:## Inherited Conventions
+     355:## Inherited Deferred Capabilities
+     366:## Non-UI / Deferred Capabilities
+     374:## Testing Requirements
+     378:### nestjs-project
+     docs/phases/phase-03-videos/context.md:132:**Note:** The maximum size is 10 GiB (`10 * 1024^3` = 10,737,418,240 bytes). It is validated against the declared size at initiation (`POST /videos`) and checked again against the actual stored size at completion. The API fixes the part size at 64 MiB (67,108,864 bytes), with a smaller last part, so a 10 GiB upload has at most 160 parts.
+     docs/phases/phase-03-videos/library-refs.md:106:await queue.upsertJobScheduler(
+     docs/phase … (+1035 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  47	## Decisions Index
+     48	
+     49	| Ref | Source | Scope | Topic | Status | Decision | Libraries |
+     50	|-----|--------|-------|-------|--------|----------|-----------|
+     51	| phase-03-videos/TD-01 | phase | Backend | Message Queue Technology | decided | A (BullMQ on Redis via `@nestjs/bullmq`) | @nestjs/bullmq, bullmq, ioredis |
+     52	| phase-03-videos/TD-02 | phase | Backend | Video Worker Runtime Topology | decided | A (same codebase, separate worker entrypoint + `video-worker` service) | — |
+     53	| phase-03-videos/TD-03 | phase | Backend | S3 Client Library | decided | A (AWS SDK v3) | @aws-sdk/client-s3, @aws-sdk/s3-request-presigner |
+     54	| phase-03-videos/TD-04 | phase | Repo-wide | Local S3-Compatible Image Sourcing (MinIO) | decided | B (fork `pgsty/minio`; diverges from Recommendation) | — |
+     55	| phase-03-videos/TD-05 | phase | Backend | Storage Endpoint Topology for Presigned URLs | decided | A (two endpoints: `S3_ENDPOINT` + `S3_PUBLIC_ENDPOINT`) | — |
+     56	| phase-03-videos/TD-06 | phase | Backend | Bucket and Object Key Layout | decided | A (one private bucket, `videos/{videoId}/…`) | — |
+     57	| phase-03-videos/TD-07 | phase | Cross-layer | Large Upload Protocol (10GB, resumable, not proxied) | decided | A (S3 multipart with presigned part URLs) | — |
+     58	| phase-03-videos/TD-08 | phase | Backend | Upload Completion Detection and Processing Trigger | decided | A (completion endpoint on the API) | — |
+     59	| phase-03-videos/TD-09 | phase | Backend | Accepted Input Formats and Playback Compatibility | decided | A (allowlist of browser-playable formats) | — |
+     60	| phase-03-videos/TD-10 | phase | Backend | Video Status Lifecycle Model | decided | A (one `status` enum: draft→processing→ready/failed; diverges from Recommendation) | — |
+     61	| phase-03-videos/TD-11 | phase | Backend | FFmpeg/ffprobe Integration Approach | decided | A (distro ffmpeg/ffprobe + typed `child_process` wrapper) | — |
+     62	| phase-03-videos/TD-12 | phase | Backend | Worker Access to the Source Video | decide … (+12028 chars)
+● Grep({"pattern": "AbortMultipart|removeOnComplete|jobId", "path": "/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/library-refs.md", "output_mode": "content"})
+  ⎿  54:- Producer (API): `@InjectQueue('video-processing') private readonly queue: Queue`, then `queue.add(name, data, { jobId: videoId })`.
+     87:  jobId: videoId,                                  // idempotent enqueue / re-enqueue
+     109:  { name: 'reconcile', data: {}, opts: { removeOnComplete: true, removeOnFail: 100 } },
+     113:`upsertJobScheduler` replaces the legacy `repeat:` option on `queue.add` (the older docs that use `QueueScheduler` predate v2 and do not apply). Deduplication options are not available on scheduler templates; the sweep's own re-enqueues rely on `jobId: videoId`.
+     160:| Abort (TD-13) | `AbortMultipartUploadCommand({ Bucket, Key, UploadId })` | Used by the reconciliation sweep. `NoSuchUpload` means it is already gone, which is idempotent. |
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/library-refs.md)
+  ⎿  78	
+     79	- **`ioredis` is no longer a direct dependency.** It is an optional peer that Redis users must install explicitly (see the `ioredis` section). The other optional peers (`pg`, `redis`, `bullmq-otel`) are not needed.
+     80	- High-level classes no longer expose Redis internals: `Queue#client`, `Worker#blockingClient` and others were removed. Use `getBackend()` instead. `Worker#waitUntilReady()` now resolves to `void`, and `Worker#resume()` is async.
+     81	- `ConnectionOptions = IORedis.RedisOptions | IORedis.Redis | …`. Plain `{ host, port }` options are enough.
+     82	
+     83	### Retries and permanent errors (TD-13)
+     84	
+     85	```ts
+     86	await queue.add('process', { videoId }, {
+     87	  jobId: videoId,                                  // idempotent enqueue / re-enqueue
+     88	  attempts: 5,
+     89	  backoff: { type: 'exponential', delay: 5_000 },  // 2^(attempt-1) * delay
+     90	});
+     91	
+     92	import { UnrecoverableError } from 'bullmq';
+     93	throw new UnrecoverableError('UNSUPPORTED_CODEC'); // → failed immediately, attempts ignored
+     94	```
+     95	
+     96	### Stalled jobs and long FFmpeg runs
+     97	
+     98	- `WorkerOptions` defaults: `lockDuration` 30000 ms, `stalledInterval` 30000 ms, `maxStalledCount` 1. The worker renews the lock automatically while `process()` runs, but a blocked event loop can lose the lock. Keep FFmpeg in a child process; never run it synchronously.
+     99	- A job that stalls more than `maxStalledCount` times fails with "job stalled more than allowable limit". Map that failure to `status = failed` in an `@OnWorkerEvent('failed')` handler only when `job.attemptsMade >= job.opts.attempts`, or when the error is unrecoverable.
+     100	- Redis must use `maxmemory-policy noeviction`, or BullMQ can lose jobs.
+     101	- Workers need `maxRetriesPerRequest: null`. BullMQ sets it by default for the connections it creates; if you pass your own ioredis instance, set it yourself, or BullMQ logs a warning.
+     102	
+     103	### Reconciliation sweep (TD-13): use job schedulers in v6
+     104	
+     105	```ts
+     106	await queue.upsertJobSchedul … (+538 chars)
+● Sources are fresh, and both answers are just clarifications (no new libraries, so the Context7 target set is empty). Applying the edits now.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/decisions/technical-decisions-phase-03-videos.md has been updated successfully.
+● Now mirroring the notes into context.md's `## Decisions Detail`, the same way the AMB-2..4 notes were recorded there.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md has been updated successfully.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md has been updated successfully.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md has been updated successfully.
+● Now validation.md: flip both issues, set `issue_count: 0`, and move them to Resolved Issues.
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Edit(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  The file /Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md has been updated successfully. (file state is current in your context — no need to Read it back)
+● Next, the `sources_mtime` refresh for the edited decisions doc, in both context.md and library-refs.md.
+● Bash(f=docs/decisions/technical-decisions-phase-03-videos.md; ts=$(date -r $(stat -f %m $f) +%Y-%m-%dT%H:%M:%S%z | sed -E 's/([0-9]{2})([0-9]{2})$/\1:\2/'); echo $ts; for t in docs/phases/phase-03-videos/context.md docs/phases/phase-03-videos/library-refs.md; do sed -i '' "s|^  $f: \"2026-10-15T14:10:31-03:00\"|  $f: \"$ts\"|" $t; grep -n "$f:" $t; done)
+  ⎿  2026-10-15T14:18:05-03:00
+     6:  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+     24:  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+● Resolved 2 issues. Run `/plan-validate phase-03-videos` to reconfirm status before building.
+
+Both issues were closed as clarifications, recorded as Notes on the existing decisions. No decision letters changed.
+
+**AMB-5: abandoned uploads.** The main Note is on TD-13, with a short cross-reference on TD-10.
+- A cleanup job (a BullMQ job scheduler) runs every 15 minutes.
+- A video still in `draft` 24 hours after creation counts as abandoned. The job cancels its multipart upload, which deletes the stored parts. It then marks the video `failed` with reason `upload_abandoned`. The row is kept so the owner can see what happened.
+- The same job re-queues videos that have been in `processing` for more than 1 hour, with `jobId = videoId` so a video is never queued twice.
+
+**AMB-6: owner read.** The main Note is on TD-15, with a cross-reference on TD-10.
+- Phase 03 gets a minimal owner-only read of a single video. It returns id, slug, status, failure reason, duration and metadata, and whether a thumbnail exists.
+- It works in every status, and returns `404` for non-owners or missing videos.
+- Listing and managing the channel's videos stays in Phase 04.
+
+I added three implementation details to the Notes that you didn't specify. Change them if they don't match what you want:
+- The draft → failed update only applies if the video is still `draft`. That way an upload finishing at the same moment isn't overwritten.
+- BullMQ won't re-add a job whose `jobId` is still stored in Redis. Finished processing jobs therefore have to be removed (`removeOnComplete`/`removeOnFail`), or the 1-hour re-queue does nothing.
+- If the upload was already cancelled (for example by the storage lifecycle rule), the cleanup job treats that as done.
+
+**Files updated:**
+- **Decisions doc:** the new Notes on TD-10, TD-13 and TD-15.
+- **context.md:** the same Notes copied into `## Decisions Detail`. The Decisions Index rows are unchanged because no status or decision changed.
+- **validation.md:** AMB-5 and AMB-6 marked resolved, `issue_count: 0`, and both moved to `## Resolved Issues`. Its `status` stays `dirty` until `/plan-validate` gives its verdict.
+- **Timestamps:** the recorded change time of the decisions doc is updated in both context.md and library-refs.md.
+
+No docs were fetched, because every library involved was already in `library-refs.md`, including `upsertJobScheduler` and `AbortMultipartUploadCommand`. One mismatch there: its sample scheduler code uses a 5-minute interval, while the decision is now 15 minutes. That file is only a docs cache, so the TD-13 Note is what counts.
+
+=== result: success turns=21 cost=$0.9654802000000001 duration=133s
+
+=== session 012e5a72-e6e7-44e0-8534-d449f3d6b2b5 model=claude-opus-5-5 cwd=/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube
+● Bash(wc -l .claude/skills/plan-pipeline/SKILL.md docs/phases/phase-03-videos/*.md && ls docs/decisions/ docs/rules/plan-validate/ 2>&1; head -40 docs/phases/phase-03-videos/validation.md)
+  ⎿       356 .claude/skills/plan-pipeline/SKILL.md
+          416 docs/phases/phase-03-videos/context.md
+          206 docs/phases/phase-03-videos/library-refs.md
+          176 docs/phases/phase-03-videos/validation.md
+         1154 total
+     ls: docs/rules/plan-validate/: No such file or directory
+     docs/decisions/:
+     technical-decisions-next-frontend-config-base.md
+     technical-decisions-next-frontend-msw-foundation.md
+     technical-decisions-next-frontend-openapi-typing.md
+     technical-decisions-openapi-docs-nestjs.md
+     technical-decisions-phase-01-configuracao-base.md
+     technical-decisions-phase-02-auth-frontend.md
+     technical-decisions-phase-02-auth.md
+     technical-decisions-phase-03-videos.md
+     ---
+     kind: phase
+     name: phase-03-videos
+     status: dirty
+     issue_count: 0
+     sources_mtime:
+       docs/phases/phase-03-videos/context.md: "2026-10-15T14:12:59-03:00"
+       docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:10:31-03:00"
+     issues:
+       - id: AMB-1
+         status: resolved
+         summary: "UI side of streaming/download/upload neither inventoried, deferred, nor Non-UI"
+         resolved_by: deferred_capability
+       - id: AMB-2
+         status: resolved
+         summary: "Draft pre-registration: owner (user vs channel) and initial fields undefined"
+         resolved_by: phase-03-videos/TD-10
+       - id: AMB-3
+         status: resolved
+         summary: "Processing outputs unspecified: which metadata fields, which thumbnail frame"
+         resolved_by: phase-03-videos/TD-11
+       - id: AMB-4
+         status: resolved
+         summary: "Stream/download access rules by viewer and video status undefined vs Phase 04"
+         resolved_by: phase-03-videos/TD-15
+       - id: AMB-5
+         status: resolved
+         summary: "Abandoned draft uploads: threshold and terminal outcome (failed vs delete) undefined"
+         resolved_by: phase-03-videos/TD-13
+       - id: AMB-6
+         status: resolved
+         summary: "Owner read of video status/metadata/slug: Phase 03 endpoint or Phase 04?"
+         resolved_by: phase-03-videos/TD-15
+       - id: OQ-1
+         status: resolved
+         summary: "TD-01 pending — Message Queue Technology"
+         reso … (+125 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/.claude/skills/plan-pipeline/SKILL.md)
+  ⎿  1	---
+     2	name: plan-pipeline
+     3	description: "Entry point and shared conventions for the plan pipeline (phase and task modes). Invoke directly when the user asks about planning without specifying a stage — this skill orients them to the pipeline stages (context → validate → resolve → build → specs [optional]). For actual work, use the stage skills: plan-context, plan-validate, plan-resolve, plan-build, plan-test-specs."
+     4	disable-model-invocation: true
+     5	---
+     6	
+     7	# Plan Pipeline Overview
+     8	
+     9	Planning is a pipeline of up to **five stages** that works for both project phases and ad-hoc tasks. Each stage is a separate skill with one responsibility and one artifact. Stages 1-4 (context → validate → resolve → build) are the canonical happy path; Stage 5 (`/plan-test-specs`) is optional and only fires when the build emitted spec placeholders. The stages share the conventions defined below — every stage skill references this document instead of repeating them.
+     10	
+     11	```
+     12	/research [opcional em task mode]       → docs/decisions/technical-decisions-{slug}.md
+     13	/plan-context <NN | slug | "prose">     → docs/{phases|tasks}/{dir}/context.md
+     14	/plan-validate <NN | slug>              → docs/{phases|tasks}/{dir}/validation.md
+     15	/plan-resolve <NN | slug>               → edits decisions doc + context.md + validation.md + library-refs.md
+     16	/plan-validate <NN | slug>              → re-run until status: clean
+     17	/plan-build <NN | slug>                 → docs/{phases|tasks}/{dir}/{name}.md
+     18	/plan-test-specs <NN | slug>                 → <subproject>/specs/<scenario>.plan.md
+     19	```
+     20	
+     21	When the user asks generically to "plan phase NN" or "plan this task", direct them to `/plan-context <arg>` first. Each stage aborts with an explicit next-command when a precondition is missing, so the pipeline self-guides once started.
+     22	
+     23	**Alternative front-door — `/decide`.** When the user input is a free-text need rather than a structured pipeline argument (e.g., "quero mudar X", "tem de … (+32696 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/validation.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	status: dirty
+     5	issue_count: 0
+     6	sources_mtime:
+     7	  docs/phases/phase-03-videos/context.md: "2026-10-15T14:12:59-03:00"
+     8	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:10:31-03:00"
+     9	issues:
+     10	  - id: AMB-1
+     11	    status: resolved
+     12	    summary: "UI side of streaming/download/upload neither inventoried, deferred, nor Non-UI"
+     13	    resolved_by: deferred_capability
+     14	  - id: AMB-2
+     15	    status: resolved
+     16	    summary: "Draft pre-registration: owner (user vs channel) and initial fields undefined"
+     17	    resolved_by: phase-03-videos/TD-10
+     18	  - id: AMB-3
+     19	    status: resolved
+     20	    summary: "Processing outputs unspecified: which metadata fields, which thumbnail frame"
+     21	    resolved_by: phase-03-videos/TD-11
+     22	  - id: AMB-4
+     23	    status: resolved
+     24	    summary: "Stream/download access rules by viewer and video status undefined vs Phase 04"
+     25	    resolved_by: phase-03-videos/TD-15
+     26	  - id: AMB-5
+     27	    status: resolved
+     28	    summary: "Abandoned draft uploads: threshold and terminal outcome (failed vs delete) undefined"
+     29	    resolved_by: phase-03-videos/TD-13
+     30	  - id: AMB-6
+     31	    status: resolved
+     32	    summary: "Owner read of video status/metadata/slug: Phase 03 endpoint or Phase 04?"
+     33	    resolved_by: phase-03-videos/TD-15
+     34	  - id: OQ-1
+     35	    status: resolved
+     36	    summary: "TD-01 pending — Message Queue Technology"
+     37	    resolved_by: phase-03-videos/TD-01
+     38	  - id: OQ-2
+     39	    status: resolved
+     40	    summary: "TD-02 pending — Video Worker Runtime Topology"
+     41	    resolved_by: phase-03-videos/TD-02
+     42	  - id: OQ-3
+     43	    status: resolved
+     44	    summary: "TD-03 pending — S3 Client Library"
+     45	    resolved_by: phase-03-videos/TD-03
+     46	  - id: OQ-4
+     47	    status: resolved
+     48	    summary: "TD-04 pending — Local S3-Compatible Image Sourcing (MinIO)"
+     49	    resolved_by: phase-03-videos/TD-04
+     50	  - id: OQ-5
+     51	    status: resolved
+     52	    summary: "TD-05 pending — Storage End … (+8347 chars)
+● Read(/Users/ricardorauberpereira/Downloads/MBA-Desafios/Upload_Processamento_Videos-StreamTube/docs/phases/phase-03-videos/context.md)
+  ⎿  1	---
+     2	kind: phase
+     3	name: phase-03-videos
+     4	sources_mtime:
+     5	  docs/project-plan.md: "2026-10-15T13:27:03-03:00"
+     6	  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+     7	  docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-15T13:28:45-03:00"
+     8	  docs/phases/phase-01-configuracao-base/context.md: "2026-10-15T13:28:45-03:00"
+     9	  docs/phases/phase-02-auth/context.md: "2026-10-15T13:28:45-03:00"
+     10	  docs/phases/phase-02-auth-frontend/context.md: "2026-10-15T13:28:45-03:00"
+     11	  .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-10-15T13:27:02-03:00"
+     12	---
+     13	
+     14	# phase-03-videos — Context
+     15	
+     16	## Scope
+     17	
+     18	**Phase name:** Fase 03 — Upload e Processamento de Vídeos
+     19	
+     20	**Capabilities** (literal, `docs/project-plan.md`):
+     21	
+     22	- Serviço de armazenamento de arquivos (vídeos e thumbnails)
+     23	- Serviço de processamento em segundo plano (filas)
+     24	- Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+     25	- Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+     26	- Processamento automático do vídeo após upload (extração de duração e metadados)
+     27	- Geração automática de thumbnail a partir de um frame do vídeo
+     28	- URL única por vídeo, sem conflito com outros vídeos
+     29	- Reprodução via streaming (sem necessidade de download completo)
+     30	- Download do vídeo pelo usuário
+     31	
+     32	**Out of scope:** _Not specified._
+     33	
+     34	**Deliverables:** upload de até 10GB funcional, processamento automático do vídeo, streaming funcionando, URLs únicas geradas.
+     35	
+     36	**Affected subprojects:** _None named explicitly for this phase in project-plan.md._
+     37	
+     38	**Deferred subprojects:** _None._
+     39	
+     40	**Sequencing notes:** "> Depende de: Fase 01, Fase 02". Intro sentence: "Upload de arquivos grandes sem travar o sistema, processamento automático do vídeo e geração de URL única."
+     41	
+     42	**Neighbors (for boundary detection only):**
+     43	
+     44	- **Phase 02:** Cadastro, Login e Gerenciamento de Cont … (+38158 chars)
+● Bash(head -15 docs/decisions/technical-decisions-phase-03-videos.md; echo ---; for f in docs/project-plan.md docs/decisions/technical-decisions-phase-03-videos.md docs/decisions/technical-decisions-openapi-docs-nestjs.md docs/phases/phase-01-configuracao-base/context.md docs/phases/phase-02-auth/context.md docs/phases/phase-02-auth-frontend/context.md .claude/skills/testing-guide-nestjs-project/SKILL.md docs/phases/phase-03-videos/context.md; do echo "$f $(stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%S%z' "$f")"; done; echo ---; grep -l '^scope_type: phase$' docs/decisions/technical-decisions-*.md; echo ---;  … (+90 chars))
+  ⎿  ---
+     scope_type: phase
+     related_phases: [3]
+     status: decided
+     date: 2026-10-15
+     scope_description: "Backend side of Phase 03: how S3-compatible object storage is used (client lib, local MinIO image, endpoint topology, key layout), queue technology and video worker runtime, resumable 10GB direct-to-storage upload, processing trigger, FFmpeg/ffprobe metadata + thumbnail extraction, video status lifecycle and failure handling, unique public video identifier, and streaming/download delivery."
+     ---
+     
+     # Technical Decisions — Phase 03: Upload e Processamento de Vídeos
+     
+     _Subprojects in scope:_
+     
+     - `nestjs-project/` — owns every TD below: API endpoints (upload orchestration, delivery URLs), the video worker (separate Compose service), and the Compose infrastructure (object storage, queue broker). All service-to-service hosts use Compose service names (`db`, `minio`, `redis`, …).
+     - `next-frontend/` — no open decision in this document. The video UI is out of scope for this phase. The TDs marked `Cross-layer` (TD-07, TD-14, TD-15) define the HTTP contracts that the frontend will consume in later phases. Under `next-frontend-config-base/TD-03` (Strict BFF), the small JSON control-plane calls go through BFF Route Handlers. Large byte transfers go browser ↔ object storage directly through presigned URLs, as that TD already anticipated.
+     
+     ---
+     docs/project-plan.md 2026-10-15T13:27:03-0300
+     docs/decisions/technical-decisions-phase-03-videos.md 2026-10-15T14:18:05-0300
+     docs/decisions/technical-decisions-openapi-docs-nestjs.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-01-configuracao-base/context.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-02-auth/context.md 2026-10-15T13:28:45-0300
+     docs/phases/phase-02-auth-frontend/context.md 2026-10-15T13:28:45-0300
+     .claude/skills/testing-guide-nestjs-project/SKILL.md 2026-10-15T13:27:02-0300
+     docs/phases/phase-03-videos/context.md 2026-10-15T14:18:42-0300
+     ---
+     docs/decisions/technical-decisions-phase-01-configuracao-base.md
+     docs/decisions/technical-decision … (+191 chars)
+● Bash(python3 - <<'EOF'
+p='docs/phases/phase-03-videos/validation.md'
+s=open(p).read()
+s=s.replace('status: dirty\nissue_count: 0','status: clean\nissue_count: 0',1)
+s=s.replace('docs/phases/phase-03-videos/context.md: "2026-10-15T14:12:59-03:00"','docs/phases/phase-03-videos/context.md: "2026-10-15T14:18:42-03:00"',1)
+s=s.replace('docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:10:31-03:00"','docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"',1)
+open(p,'w').write(s)
+EOF
+head -9 docs/phases/phase-03-videos/validation.md; git diff --stat docs/pha … (+33 chars))
+  ⎿  ---
+     kind: phase
+     name: phase-03-videos
+     status: clean
+     issue_count: 0
+     sources_mtime:
+       docs/phases/phase-03-videos/context.md: "2026-10-15T14:18:42-03:00"
+       docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-15T14:18:05-03:00"
+     issues:
+● Validation for `phase-03-videos` came back **clean**: no open issues, so `/plan-build phase-03-videos` can run.
+
+**Preflight checks**
+- The argument resolved to phase 03, which has a single slice (`phase-03-videos`). Because there is only one slice, the cross-slice check (CC/MC-cross) was skipped.
+- `context.md` is up to date: none of its 7 source files has changed since it was built.
+- There are no custom rules in `docs/rules/plan-validate/`.
+
+**Check results:** every category is `_None._`.
+- **Inconsistencies:** no Frontend-scoped TD is left without a home, and there's no UI inventory to compare against. The places where TD-04, TD-10, TD-02 and TD-11 depart from their Recommendation are each explained in a Note, so they don't count as contradictions.
+- **Ambiguities and missing decisions:** all 9 capabilities map to at least one TD. The error-response format is inherited from `phase-02-auth/TD-07`. The FE↔BE contract-sync check doesn't apply because UI is not in scope.
+- **Dependency gaps:** the channel FK (`videos.channel_id`) and the auth guards come from Phase 02. Redis and MinIO are set up in this phase.
+- **Inherited constraint conflicts:** none of the new TDs conflicts with an inherited TD or convention.
+- **Open questions and UI coverage gaps:** no TDs are pending and there's no UI inventory. Upload, streaming and download UI are listed as deferred.
+
+**Changes to `validation.md`**
+- The previous file said `status: dirty` even though all 21 issues were resolved. That was wrong, and the verdict is now `clean`.
+- I updated the recorded timestamps for `context.md` (14:18:42) and the decisions doc (14:18:05).
+- All 21 resolved issues (AMB-1–6, OQ-1–15) are still recorded.
+
+**Not a blocker, but `/plan-build` will need to pick a value:** no decision sets how long the presigned links stay valid, neither for streaming/download (TD-15) nor for uploading parts (TD-07). TD-15's Recommendation only says the time should be longer than a typical viewing session. I didn't log this as an issue, because `/plan-build` can make it a configurable setting with a default.
+
+=== result: success turns=7 cost=$0.6292948 duration=68s
+
