@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -12,7 +21,9 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
+import { VideoResponseDto } from './dto/video-response.dto';
 import { VideoUploadsService } from './video-uploads.service';
+import { VideosService } from './videos.service';
 
 // The auth rate limit must not block clients requesting batches of part URLs
 @ApiTags('videos')
@@ -20,7 +31,10 @@ import { VideoUploadsService } from './video-uploads.service';
 @SkipThrottle()
 @Controller('videos')
 export class VideosController {
-  constructor(private readonly videoUploadsService: VideoUploadsService) {}
+  constructor(
+    private readonly videosService: VideosService,
+    private readonly videoUploadsService: VideoUploadsService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -59,5 +73,40 @@ export class VideosController {
       dto,
     );
     return CreateVideoResponseDto.from(video, upload);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get a video',
+    description:
+      "Returns the caller's video in any status, so clients can poll processing progress and read the slug that forms the video's unique URL.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The video',
+    type: VideoResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'VALIDATION_ERROR — `id` is not a UUID',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'VIDEO_NOT_FOUND — the video does not exist or belongs to another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async findOne(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VideoResponseDto> {
+    const video = await this.videosService.findOwnedOrFail(user.sub, id);
+    return VideoResponseDto.fromEntity(video);
   }
 }

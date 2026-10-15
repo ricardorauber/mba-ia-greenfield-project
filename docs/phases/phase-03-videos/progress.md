@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 9/20 completed
+**SIs:** 10/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -95,9 +95,12 @@
   - Fixtures: the 1080p clip is 1 s long with `-preset ultrafast`, and the VP9 clip uses `-deadline realtime`, to keep generation fast (whole integration suite ~9 s). The corrupt `.mp4` is the first 1 KiB of the H.264 fixture; ffmpeg writes the `moov` atom at the end, so the head alone triggers `moov atom not found`.
 
 ### SI-03.9 — Endpoint GET /videos/:id (leitura do dono)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 5 passing (`test/videos-get.e2e-spec.ts`, derived from `specs/videos-get.plan.md`; the SI's Tests section is the empty form); 0 leftover multipart uploads
+- **Observations:**
+  - `VideosController` now injects `VideosService` too (for `findOwnedOrFail`) alongside `VideoUploadsService`; the handler is just `findOwnedOrFail` → `VideoResponseDto.fromEntity`.
+  - Each test creates two users (owner and stranger), which is 6 auth requests, so `beforeEach` clears the throttler storage, as in `videos-create`.
+  - The 404 test asserts that the stranger's 404 body and the random-UUID 404 body are byte-identical (`toEqual`), covering the "doesn't leak existence" AC.
 
 ### SI-03.10 — Endpoint GET /videos/:id/upload (estado para retomada)
 - **Status:** pending
@@ -112,7 +115,8 @@
 ### SI-03.15 — VideoProcessingService: extração de metadados e geração de thumbnail
 - **Status:** pending
 - **Tests:** —
-- **Observations:** none
+- **Observations:**
+  - **Maestro decision (from the SI-03.14 review, to apply here):** when `format.duration` is missing, fall back to the video stream's `duration`; if neither exists, treat it as a permanent `invalid_media` error (a `ready` video always has a duration). Storage 404 stays `transient`, as planned.
 
 ### SI-03.12 — Endpoint POST /videos/:id/upload/complete (conclusão + disparo do processamento)
 - **Status:** pending
