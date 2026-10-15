@@ -1,7 +1,9 @@
 import { randomBytes } from 'crypto';
+import { getQueueToken } from '@nestjs/bullmq';
 import { ConfigModule } from '@nestjs/config';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import type { Queue } from 'bullmq';
 import { DataSource } from 'typeorm';
 import { Channel } from '../channels/entities/channel.entity';
 import { configModuleOptions } from '../config/config-module.options';
@@ -9,18 +11,23 @@ import { DatabaseModule } from '../database/database.module';
 import { StorageService } from '../storage/storage.service';
 import { cleanAllTables } from '../test/create-test-data-source';
 import { User } from '../users/entities/user.entity';
+import {
+  PROCESS_VIDEO_JOB,
+  VIDEO_PROCESSING_QUEUE,
+} from '../video-processing/video-processing.queue';
 import { Video, VideoStatus } from './entities/video.entity';
 import { VideoUploadsService } from './video-uploads.service';
 import { videoOriginalKey, videoPrefix } from './video-storage-keys';
 import { VideosModule } from './videos.module';
 
-describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
-  jest.setTimeout(30000);
+describe('VideoUploadsService (integration, Postgres + MinIO + Redis)', () => {
+  jest.setTimeout(60000);
 
   let module: TestingModule;
   let dataSource: DataSource;
   let uploads: VideoUploadsService;
   let storage: StorageService;
+  let queue: Queue;
   // id → upload_id, captured at creation: beforeEach wipes the rows
   const createdUploads = new Map<string, string>();
 
@@ -37,6 +44,7 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
     dataSource = module.get(DataSource);
     uploads = module.get(VideoUploadsService);
     storage = module.get(StorageService);
+    queue = module.get(getQueueToken(VIDEO_PROCESSING_QUEUE));
   });
 
   afterAll(async () => {
@@ -45,6 +53,7 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
       await storage.deletePrefix(videoPrefix(id));
     }
     await cleanAllTables(dataSource);
+    await queue.obliterate({ force: true });
     await module.close();
   });
 
@@ -154,5 +163,44 @@ describe('VideoUploadsService (integration, Postgres + MinIO)', () => {
     ).resolves.toEqual([
       expect.objectContaining({ partNumber: 1, size: 5 * 1024 * 1024 }),
     ]);
+  });
+
+  it('should assemble 64 MiB + remainder, move to processing and enqueue the job', async () => {
+    const { user } = await createChannelOwner();
+    const declaredSize = 67108864 + 1048576;
+    const { video } = await uploads.initiate(user.id, {
+      file_name: 'clip.mp4',
+      mime_type: 'video/mp4',
+      size: declaredSize,
+    });
+    createdUploads.set(video.id, video.upload_id);
+
+    const { parts } = await uploads.presignParts(user.id, video.id, [1, 2]);
+    for (const [part, size] of [
+      [parts[0], 67108864],
+      [parts[1], 1048576],
+    ] as const) {
+      const res = await fetch(part.url, {
+        method: 'PUT',
+        body: new Uint8Array(randomBytes(size)),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    const completed = await uploads.complete(user.id, video.id);
+
+    expect(completed.status).toBe(VideoStatus.Processing);
+    const row = await dataSource
+      .getRepository(Video)
+      .findOneByOrFail({ id: video.id });
+    expect(row.status).toBe(VideoStatus.Processing);
+    expect(row.processing_started_at).toBeInstanceOf(Date);
+    await expect(
+      storage.headObject(videoOriginalKey(video.id)),
+    ).resolves.toEqual({ contentLength: declaredSize });
+    const job = await queue.getJob(video.id);
+    expect(job).toBeDefined();
+    expect(job!.name).toBe(PROCESS_VIDEO_JOB);
+    expect(job!.data).toEqual({ videoId: video.id });
   });
 });

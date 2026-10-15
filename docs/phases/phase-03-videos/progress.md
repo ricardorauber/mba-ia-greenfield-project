@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 13/20 completed
+**SIs:** 14/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -134,9 +134,14 @@
   - `VideoProcessingModule` exports `VideoProcessingService` so the worker module (SI-03.16) can consume it; it has no `@Processor`.
 
 ### SI-03.12 — Endpoint POST /videos/:id/upload/complete (conclusão + disparo do processamento)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 50 passing in `video-uploads.service.spec.ts` + `video-uploads.service.integration-spec.ts` + `videos.module.spec.ts` (11 new unit cases, 1 new integration case with real Postgres + MinIO + Redis uploading 64 MiB + 1 MiB); e2e `test/videos-upload-complete.e2e-spec.ts` 7 passing (derived from `specs/videos-upload-complete.plan.md`); full e2e suite 81 passing (8 suites); 0 leftover multipart uploads
+- **Observations:**
+  - `complete()` checks the stored object with one `headObject` for both paths: after `CompleteMultipartUpload`, or when `listParts` returns `null` (upload already assembled by an earlier call that crashed before the status change). A missing object → `UPLOAD_INCOMPLETE`; a size ≠ `declared_size` (or > 10 GiB) → delete the object, `markFailed('size_mismatch', draft)`, `UPLOAD_SIZE_MISMATCH`. The response re-reads the video (`findOwnedOrFail`) so it reflects `processing` and `processing_started_at`.
+  - `VideosModule` now imports `VideoProcessingQueueModule`, so `AppModule` (and every e2e suite) loads BullMQ. This is the first real use of the SI-03.5 ESM transform in `test/jest-e2e.json`, and it works (all 8 e2e suites green). `videos.module.spec.ts` now loads `queueConfig` too.
+  - **Spec typo:** scenario 2.2 of `specs/videos-upload-complete.plan.md` sets `failure_reason = 'abandoned_upload'`; the Data Model value is `upload_abandoned`, which the e2e uses (the column is a plain varchar, so the scenario's outcome does not depend on it).
+  - Not covered (outside the plan): if a client uploads non-last parts smaller than 5 MiB whose sizes still add up to `declared_size`, S3 rejects `CompleteMultipartUpload` with `EntityTooSmall`, which surfaces as a 500. The 64 MiB part plan makes this a misbehaving-client case only. Mapping it to `UPLOAD_INCOMPLETE` would be a separate task.
+  - After the e2e run, Redis keeps `streamtube-test:video-processing:meta` (BullMQ's queue-level metadata hash, re-created after `obliterate`); no job, wait or active keys are left.
 
 ### SI-03.13 — Endpoints de entrega: streaming, download e thumbnail
 - **Status:** pending

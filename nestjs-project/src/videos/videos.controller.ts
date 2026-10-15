@@ -199,4 +199,47 @@ export class VideosController {
     );
     return PartUrlsResponseDto.from(result);
   }
+
+  @Post(':id/upload/complete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Complete a video upload',
+    description:
+      'Assembles the uploaded parts in storage, checks the stored size against the declared one, moves the video to processing and queues it for processing. Idempotent: calling it again on a processing or ready video returns its current state.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'The video, now processing (or its current status on a replay)',
+    type: VideoResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'VALIDATION_ERROR — `id` is not a UUID',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'VIDEO_NOT_FOUND — the video does not exist or belongs to another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'UPLOAD_INCOMPLETE (parts missing; the video stays a draft and the upload can resume), UPLOAD_SIZE_MISMATCH (stored size differs from the declared one; the video fails) or INVALID_VIDEO_STATUS (the video failed)',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async completeUpload(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VideoResponseDto> {
+    const video = await this.videoUploadsService.complete(user.sub, id);
+    return VideoResponseDto.fromEntity(video);
+  }
 }

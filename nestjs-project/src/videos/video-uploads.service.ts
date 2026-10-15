@@ -2,7 +2,9 @@ import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { Injectable, Logger } from '@nestjs/common';
 import { ChannelsService } from '../channels/channels.service';
+import type { UploadedPart } from '../storage/storage.service';
 import { StorageService } from '../storage/storage.service';
+import { VideoProcessingProducer } from '../video-processing/video-processing.producer';
 import type { CreateVideoDto } from './dto/create-video.dto';
 import { type Video, VideoStatus } from './entities/video.entity';
 import {
@@ -10,6 +12,8 @@ import {
   InvalidPartNumberException,
   InvalidVideoStatusException,
   UnsupportedVideoFormatException,
+  UploadIncompleteException,
+  UploadSizeMismatchException,
   VideoTooLargeException,
 } from './exceptions/video.exceptions';
 import { videoOriginalKey } from './video-storage-keys';
@@ -59,6 +63,7 @@ export class VideoUploadsService {
     private readonly videosService: VideosService,
     private readonly channelsService: ChannelsService,
     private readonly storageService: StorageService,
+    private readonly processingProducer: VideoProcessingProducer,
   ) {}
 
   async initiate(
@@ -161,6 +166,87 @@ export class VideoUploadsService {
         url,
       })),
     };
+  }
+
+  /**
+   * Assembles the uploaded parts, checks the real size and hands the video to
+   * the worker (TD-07, TD-08). Replays on `processing`/`ready` return the
+   * current video without side effects.
+   */
+  async complete(userId: string, id: string): Promise<Video> {
+    const video = await this.videosService.findOwnedOrFail(userId, id);
+    if (
+      video.status === VideoStatus.Processing ||
+      video.status === VideoStatus.Ready
+    ) {
+      return video;
+    }
+    if (video.status !== VideoStatus.Draft) {
+      throw new InvalidVideoStatusException();
+    }
+
+    const key = videoOriginalKey(id);
+    const parts = await this.storageService.listParts(key, video.upload_id);
+    // `null`: the multipart upload is gone, typically because an earlier call
+    // completed it and failed before the status change; the object decides
+    if (parts !== null) {
+      this.assertAllPartsUploaded(parts, video.declared_size);
+      await this.storageService.completeMultipartUpload(
+        key,
+        video.upload_id,
+        parts,
+      );
+    }
+
+    const stored = await this.storageService.headObject(key);
+    if (!stored) {
+      throw new UploadIncompleteException();
+    }
+    // The presigned part URLs cannot enforce sizes, so the assembled object
+    // is the source of truth (TD-07)
+    if (
+      stored.contentLength !== video.declared_size ||
+      stored.contentLength > MAX_VIDEO_SIZE_BYTES
+    ) {
+      await this.storageService.deleteObject(key);
+      await this.videosService.markFailed(
+        id,
+        'size_mismatch',
+        VideoStatus.Draft,
+      );
+      throw new UploadSizeMismatchException();
+    }
+
+    // `false`: the reconciliation sweep abandoned the draft in the meantime
+    if (!(await this.videosService.markProcessing(id))) {
+      throw new InvalidVideoStatusException();
+    }
+
+    try {
+      await this.processingProducer.enqueue(id);
+    } catch (err) {
+      // The sweep re-enqueues videos stuck in processing (TD-13)
+      this.logger.warn(
+        `Failed to enqueue processing of video ${id}: ${String(err)}`,
+      );
+    }
+
+    return this.videosService.findOwnedOrFail(userId, id);
+  }
+
+  // Parts must be exactly 1..part_count and add up to the declared size
+  private assertAllPartsUploaded(
+    parts: UploadedPart[],
+    declaredSize: number,
+  ): void {
+    const { part_count } = this.uploadPlan(declaredSize);
+    const contiguous =
+      parts.length === part_count &&
+      parts.every((part, index) => part.partNumber === index + 1);
+    const totalSize = parts.reduce((sum, part) => sum + part.size, 0);
+    if (!contiguous || totalSize !== declaredSize) {
+      throw new UploadIncompleteException();
+    }
   }
 
   // Ownership is checked first so non-owners always get 404, never 409
