@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 4/20 completed
+**SIs:** 5/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -38,9 +38,14 @@
   - **Testing-guide drift (covered by SI-03.20):** `testing-guide-nestjs-project/references/external-systems.md` still prescribes a local-filesystem storage adapter for tests; this phase follows the plan (real MinIO per TD-04/TD-05).
 
 ### SI-03.5 — QueueModule e fila `video-processing` (contratos + producer)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 4 passing (`video-processing.producer.integration-spec.ts`, real Redis); fix loop 1/3. Full suites re-run after the Jest config change: 184 unit/integration (28 suites), 52 e2e (3 suites).
+- **Observations:**
+  - **ESM-only package (fix attempt 1):** `@nestjs/bullmq@12.0.0` and its dependency `@nestjs/bull-shared@12.0.0` ship as `"type": "module"`. The real runtime is unaffected: Node 25 `require()`s them fine, and `tsc` passes. But Jest (CommonJS through ts-jest) doesn't transform `node_modules`, so it failed with `SyntaxError: Unexpected token 'export'`. Fixed in both `package.json` (jest) and `test/jest-e2e.json`: `transformIgnorePatterns` now lets those two packages through, and a dedicated transform runs them through ts-jest with an inline `{ allowJs: true }` (ts-jest merges inline options over `tsconfig.json`). Downgrading to the CommonJS 11.x line was rejected because it would break the TD-01 pin. No e2e test imports `@nestjs/bullmq` yet; that config is first used in SI-03.12.
+  - `prefix` is still a top-level `QueueOptions` field in BullMQ 6 (via `KeyPrefixOptions`), so `BullModule.forRootAsync` passes `{ connection, prefix }` as planned.
+  - `PROCESS_VIDEO_JOB_OPTIONS` uses `as const satisfies JobsOptions`, so the options are type-checked against BullMQ while staying literal.
+  - The producer test uses a unique prefix per file (`${QUEUE_PREFIX}-producer-<uuid>`, i.e. `streamtube-test-producer-…`), drains the queue after each test, obliterates it in `afterAll`, and scans Redis keys to cover the "keys under the configured prefix" acceptance criterion. Leftover keys after the run: 0.
+  - Node prints `Warning: --localstorage-file was provided without a valid path` on every Jest run. It's a Node 25 runtime warning, not from this SI; investigating it is a separate task.
 
 ### SI-03.6 — Entidade `Video` e migration `CreateVideos`
 - **Status:** pending
