@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 7/20 completed
+**SIs:** 8/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -67,9 +67,19 @@
   - `isPgUniqueViolationOnColumn` still matches by `detail.includes(column)`, unchanged as the plan requires. That substring check could also match a *value* that happens to contain the column name (e.g. a nickname containing "slug"); tightening it to `Key (<column>)=` would be a separate task.
 
 ### SI-03.8 — Endpoint POST /videos (início do upload + pré-cadastro do rascunho)
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `video-uploads.service.spec.ts` 17 + `video-uploads.service.integration-spec.ts` 1 + `videos.module.spec.ts` 1; e2e `test/videos-create.e2e-spec.ts` 7 (spec-derived from `specs/videos-create.plan.md`); full e2e 59 passing (4 suites); full unit/integration 226 passing excluding `migrations.integration-spec.ts` (see escalation below); fix loop 1/3; 0 leftover multipart uploads in MinIO
+- **Observations:**
+  - **ESCALATION — SI-03.6 regression in `src/database/migrations.integration-spec.ts`:** its `beforeAll` drops `MANAGED_TABLES` in parallel (`Promise.all` of `DROP TABLE ... CASCADE`). Since SI-03.6 added `videos` (FK → `channels`), dropping `channels CASCADE` and `videos` concurrently can hit Postgres `deadlock detected` (a timing race; it passed when run alone in SI-03.6 and SI-03.8). In the full `npm test` run it deadlocked. `afterAll` then couldn't re-apply the migrations, so the shared DB was left with only a stray `channels` table and an empty `migrations` table, and 14 later suites failed on missing tables. The dev DB was restored manually (dropped the stray `channels` with one auth-fixture row and both enum types, then `npm run migration:run` → 3 migrations). Not fixed here, because the skill says not to edit a completed SI quietly. Proposed fix: run the DROPs sequentially (or as a single `DROP TABLE IF EXISTS a, b, … CASCADE`), as a bugfix before continuing.
+  - **`test:e2e` lacked `--runInBand`:** `nestjs-project/CLAUDE.md` says e2e "always with --runInBand … already configured", but the script was `jest --config ./test/jest-e2e.json`. With the new `videos-create` suite (which wipes shared tables) running in parallel with `auth`, all 4 e2e suites failed. Added `--runInBand` to the script (one flag, matching the documented convention); `npm run test:e2e` → 59/59.
+  - **Latent module-graph gap (affects SI-03.16):** `ChannelsModule` registers only `Channel`, whose `user` relation needs `User` metadata; with `autoLoadEntities`, `User` is only registered by `UsersModule` (which itself imports `ChannelsModule`, so the reverse import would be circular). Inside `AppModule` it works; a graph of `DatabaseModule` + `VideosModule` alone fails with `Entity metadata for Channel#user was not found`. The integration test adds `TypeOrmModule.forFeature([User])` to mirror `AppModule` (fix attempt 1). The worker graph in SI-03.16 will hit the same error and needs a decision there.
+  - `createAuthenticatedUser(app, email?)` returns `{ userId, email, access_token }` (superset of the plan's "returns `access_token`"): later specs need two distinct users per test and the owner's channel. It generates a unique email and reads `userId` from the JWT `sub`. It makes 3 auth requests against the global 10/min throttler, so every video e2e suite must `throttlerStorage.storage.clear()` in `beforeEach` (done in `videos-create`; the specs for SI-03.9–03.13 don't mention it).
+  - The helper spies on `app.get(MailService)` instead of `(authService as any).mailService`: same singleton, but typed. `test/helpers/**` is not covered by the ESLint test-file relaxation of `unsafe-*` rules. The auth suite now imports `captureConfirmationToken`/`registerConfirmAndLogin` from the helper; behaviour unchanged (auth e2e green).
+  - `VideosModule` now imports `StorageModule`; `videos.module.spec.ts` (from SI-03.7) gained a global `ConfigModule` with `storageConfig` so the module still compiles in isolation.
+  - Title default strips the extension via `path.extname` and truncates to 100 chars; an explicit `title` is trimmed by the DTO `@Transform`. `extname('clip')` = `''`, so a file name without an extension is rejected as `UNSUPPORTED_VIDEO_FORMAT`.
+  - When `createDraft` fails, the multipart abort is best-effort: an abort failure is logged as a warning and the original error is rethrown; the reconciliation sweep (SI-03.17) is the safety net.
+  - `metadata.ts` (Swagger CLI plugin output) was not regenerated; `openapi.json` regeneration belongs to SI-03.19.
+  - Wrote one throwaway log to the host's `/tmp/full.log` while diagnosing (should have used the session scratchpad); it is outside the repo.
 
 ### SI-03.14 — MediaToolsService: wrapper tipado de ffprobe/ffmpeg
 - **Status:** pending
