@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 3/20 completed
+**SIs:** 4/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -28,9 +28,14 @@
   - **Pre-existing flake (out of scope):** on the first, cold run of `src/auth`, `auth.service.integration-spec.ts` timed out in `beforeAll` (`createAuthTestModule()` > Jest's 5000 ms default), and `afterAll` then crashed on `dataSource.destroy()` because `dataSource` was never assigned. It passed on an unchanged re-run. That suite builds its own `ConfigModule`/`TypeOrmModule` and doesn't import anything this SI touched. Separate task: give its `beforeAll` a longer timeout and guard `afterAll` with `dataSource?.destroy()`.
 
 ### SI-03.4 — StorageModule: clientes S3 interno/público, multipart e URLs pré-assinadas
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 14 passing (`storage.module.spec.ts` 3, `storage.service.integration-spec.ts` 11 against real MinIO)
+- **Observations:**
+  - `presignUploadPart`/`presignGet` return `{ url, expiresIn }`; `presignInternalGet` returns a plain `string`, because SI-03.15 passes it straight to ffprobe/ffmpeg as input.
+  - `completeMultipartUpload` sorts the parts ascending itself and accepts `Pick<UploadedPart, 'partNumber' | 'etag'>[]`, so callers can pass the `listParts` result directly.
+  - `StorageService` implements `OnModuleDestroy` and calls `destroy()` on both `S3Client`s to release sockets (no open-handle warnings in Jest).
+  - The `StorageModule` unit spec proves the two clients have different endpoints by presigning with each one (a local signature, no network) and comparing the URL origins. Inside Jest the setup file makes `S3_ENDPOINT` and `S3_PUBLIC_ENDPOINT` both `http://minio:9000`, so the spec sets its own two fake hosts.
+  - **Testing-guide drift (covered by SI-03.20):** `testing-guide-nestjs-project/references/external-systems.md` still prescribes a local-filesystem storage adapter for tests; this phase follows the plan (real MinIO per TD-04/TD-05).
 
 ### SI-03.5 — QueueModule e fila `video-processing` (contratos + producer)
 - **Status:** pending
