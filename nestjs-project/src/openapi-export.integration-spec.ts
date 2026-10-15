@@ -128,4 +128,107 @@ describe('exportSpec (integration)', () => {
       }
     }
   });
+
+  describe('videos contract', () => {
+    type Operation = {
+      tags?: string[];
+      security?: Array<Record<string, unknown>>;
+      responses: Record<string, Record<string, any>>;
+    };
+    const VIDEO_OPERATIONS = [
+      { path: '/videos', method: 'post' },
+      { path: '/videos/{id}', method: 'get' },
+      { path: '/videos/{id}/upload', method: 'get' },
+      { path: '/videos/{id}/upload/part-urls', method: 'post' },
+      { path: '/videos/{id}/upload/complete', method: 'post' },
+      { path: '/videos/{id}/stream', method: 'get' },
+      { path: '/videos/{id}/download', method: 'get' },
+      { path: '/videos/{id}/thumbnail', method: 'get' },
+    ];
+    const REDIRECT_PATHS = [
+      '/videos/{id}/stream',
+      '/videos/{id}/download',
+      '/videos/{id}/thumbnail',
+    ];
+    const apiErrorRef = '#/components/schemas/ApiErrorEnvelope';
+
+    const operation = (path: string, method: string): Operation => {
+      const paths = document.paths as Record<string, Record<string, Operation>>;
+      return paths[path]?.[method];
+    };
+
+    it.each(VIDEO_OPERATIONS)(
+      'documents $method $path under the videos tag with access-token security',
+      ({ path, method }) => {
+        const op = operation(path, method);
+
+        expect(op).toBeDefined();
+        expect(op.tags).toEqual(['videos']);
+        expect(op.security?.some((req) => 'access-token' in req)).toBe(true);
+      },
+    );
+
+    it.each(VIDEO_OPERATIONS)(
+      'references ApiErrorEnvelope in every error response of $method $path',
+      ({ path, method }) => {
+        const errors = Object.entries(operation(path, method).responses).filter(
+          ([status]) => Number(status) >= 400,
+        );
+
+        expect(errors.map(([status]) => status)).toEqual(
+          expect.arrayContaining(['400', '401', '404']),
+        );
+        for (const [, response] of errors) {
+          expect(response.content['application/json'].schema.$ref).toBe(
+            apiErrorRef,
+          );
+        }
+      },
+    );
+
+    it.each(REDIRECT_PATHS)(
+      'documents GET %s as a 302 with a Location header',
+      (path) => {
+        const responses = operation(path, 'get').responses;
+
+        expect(responses['302'].headers.Location.schema).toEqual({
+          type: 'string',
+          format: 'uri',
+        });
+        expect(responses['409']).toBeDefined();
+      },
+    );
+
+    it('declares the VideoResponseDto status enum and nullable processing fields', () => {
+      const components = document.components as Record<string, any>;
+      const props = components.schemas.VideoResponseDto.properties;
+
+      expect(props.status.enum).toEqual([
+        'draft',
+        'processing',
+        'ready',
+        'failed',
+      ]);
+      for (const field of [
+        'failure_reason',
+        'duration',
+        'width',
+        'height',
+        'size',
+        'metadata',
+      ]) {
+        expect(props[field].nullable).toBe(true);
+      }
+    });
+
+    it('is reflected in the committed openapi.json', () => {
+      const committed = JSON.parse(
+        readFileSync(join(__dirname, '..', 'openapi.json'), 'utf-8'),
+      ) as { paths: Record<string, Record<string, unknown>> };
+
+      for (const { path, method } of VIDEO_OPERATIONS) {
+        expect(committed.paths[path]?.[method]).toBeDefined();
+      }
+    });
+  });
 });

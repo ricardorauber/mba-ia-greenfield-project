@@ -1,6 +1,26 @@
 import { applyDecorators, Header, Redirect } from '@nestjs/common';
-import { ApiOperation, ApiResponse, getSchemaPath } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiResponse,
+  type ApiResponseOptions,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { ApiErrorEnvelope } from '../../common/openapi/api-error-envelope.dto';
+
+/**
+ * The 302 of the delivery routes. Apply it with `@ApiFoundResponse` directly on
+ * each handler: the Swagger CLI plugin only skips its auto-generated `200` when
+ * it sees a success/redirect response decorator on the method itself.
+ */
+export const DELIVERY_REDIRECT_RESPONSE: ApiResponseOptions = {
+  description: 'Redirect to a short-lived presigned storage URL',
+  headers: {
+    Location: { schema: { type: 'string', format: 'uri' } },
+    'Cache-Control': {
+      schema: { type: 'string', example: 'private, no-store' },
+    },
+  },
+};
 
 /**
  * Shared shape of the delivery routes: a 302 to a presigned storage URL that
@@ -16,16 +36,6 @@ export function ApiDeliveryRedirect(
     Redirect(),
     Header('Cache-Control', 'private, no-store'),
     ApiOperation({ summary, description }),
-    ApiResponse({
-      status: 302,
-      description: 'Redirect to a short-lived presigned storage URL',
-      headers: {
-        Location: { schema: { type: 'string', format: 'uri' } },
-        'Cache-Control': {
-          schema: { type: 'string', example: 'private, no-store' },
-        },
-      },
-    }),
     ApiResponse({
       status: 400,
       description: 'VALIDATION_ERROR — `id` is not a UUID',

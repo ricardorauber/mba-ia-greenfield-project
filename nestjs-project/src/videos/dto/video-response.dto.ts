@@ -41,7 +41,7 @@ export class VideoResponseDto {
   @ApiProperty({ enum: ['video/mp4', 'video/webm'], example: 'video/mp4' })
   mime_type: string;
 
-  @ApiProperty({ enum: VideoStatus, enumName: 'VideoStatus' })
+  @ApiProperty({ enum: VideoStatus })
   status: VideoStatus;
 
   @ApiProperty({

@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 17/20 completed
+**SIs:** 18/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -179,9 +179,14 @@
   - **Cleanup:** removed 3 orphaned video prefixes from MinIO that my SI-03.16 dev-stack check created; their rows had already been wiped by test `cleanAllTables`, since tests share the dev DB.
 
 ### SI-03.19 — OpenAPI: completar schemas de vídeos e regenerar `openapi.json`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** `src/openapi-export.integration-spec.ts` 30 passing (21 new in a `videos contract` block: 8 operations × tag + `access-token`, 8 × errors referencing `ApiErrorEnvelope`, 3 × `302` with `Location`, the `status` enum + nullable fields, and the committed file containing the 8 paths); `test/swagger.e2e-spec.ts` 7 passing (+1: with `SWAGGER_ENABLED=true`, `/api/docs-json` lists the 8 video paths); re-running `npm run openapi:export` produced a byte-identical `openapi.json`
+- **Observations:**
+  - **Export pipeline fix:** `openapi:export` ran `src/openapi-export.ts` through `ts-node`, where the `@nestjs/swagger` CLI plugin never runs. Every request DTO that (per `.claude/rules/nestjs-dtos.md`) relies on the plugin was therefore exported with **empty `properties`**: `RegisterDto`, `LoginDto`, … in the committed file since the OpenAPI task, and `CreateVideoDto`/`CreatePartUrlsDto` now. Meanwhile the runtime `/api/docs` (built with `nest build`) was complete, a drift TD-02 Option C says must not happen. The script is now `nest build && node dist/openapi-export.js`. The command the plan uses is unchanged, and it now builds `dist/` first (`deleteOutDir: true`), so don't run it while a `start:dev` is writing to `dist/`. Adding `@ApiProperty` to request DTOs was rejected because it goes against the DTO rule.
+  - Side effects in the regenerated `openapi.json` (all corrections): the 6 auth request DTOs gain their fields; `GET /auth/confirm-email` now documents its required `token` query parameter; `GET /` declares a string body.
+  - **Spurious `200` on the redirect routes:** the plugin auto-adds `ApiResponse({ status: 200 })` unless it sees a success/redirect response decorator **on the method itself**; the 302 lived inside the composite `ApiDeliveryRedirect`. The 302 is now applied per handler with `@ApiFoundResponse(DELIVERY_REDIRECT_RESPONSE)` (shared options exported from the decorator file); the composite keeps `@Redirect`, `Cache-Control`, `@ApiOperation` and the error responses.
+  - `VideoResponseDto.status` dropped `enumName: 'VideoStatus'`, so the four values are declared inline in `VideoResponseDto` (as the AC states) instead of through a `$ref` to a separate `VideoStatus` schema. `metadata` renders as `nullable` + `allOf: [$ref VideoMetadataDto]`. No `@ApiExtraModels` was needed: the only manual `$ref` is `ApiErrorEnvelope`, already registered via `extraModels` in `buildSwaggerDocument`.
+  - The integration spec exports through `ts-jest` (no plugin), so its assertions cover only what explicit decorators produce. Request-DTO completeness is guaranteed by the build-based `openapi:export` and visible in the committed file's diff.
 
 ### SI-03.18 — E2E do pipeline completo: upload → processamento → streaming/download
 - **Status:** pending

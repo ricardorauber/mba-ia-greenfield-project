@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiFoundResponse,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -20,7 +21,10 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
-import { ApiDeliveryRedirect } from './decorators/api-delivery-redirect.decorator';
+import {
+  ApiDeliveryRedirect,
+  DELIVERY_REDIRECT_RESPONSE,
+} from './decorators/api-delivery-redirect.decorator';
 import { CreatePartUrlsDto } from './dto/create-part-urls.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
 import { PartUrlsResponseDto } from './dto/part-urls-response.dto';
@@ -248,6 +252,7 @@ export class VideosController {
   }
 
   @Get(':id/stream')
+  @ApiFoundResponse(DELIVERY_REDIRECT_RESPONSE)
   @ApiDeliveryRedirect(
     'Stream a video',
     'Redirects to a presigned URL of the original file; storage serves Range requests (206), so playback never needs the whole file.',
@@ -261,6 +266,7 @@ export class VideosController {
   }
 
   @Get(':id/download')
+  @ApiFoundResponse(DELIVERY_REDIRECT_RESPONSE)
   @ApiDeliveryRedirect(
     'Download a video',
     'Redirects to a presigned URL of the original file that responds with Content-Disposition: attachment and the original file name.',
@@ -274,6 +280,7 @@ export class VideosController {
   }
 
   @Get(':id/thumbnail')
+  @ApiFoundResponse(DELIVERY_REDIRECT_RESPONSE)
   @ApiDeliveryRedirect(
     'Get a video thumbnail',
     'Redirects to a presigned URL of the JPEG thumbnail generated during processing.',
