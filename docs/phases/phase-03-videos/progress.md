@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 14/20 completed
+**SIs:** 15/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -144,9 +144,13 @@
   - After the e2e run, Redis keeps `streamtube-test:video-processing:meta` (BullMQ's queue-level metadata hash, re-created after `obliterate`); no job, wait or active keys are left.
 
 ### SI-03.13 — Endpoints de entrega: streaming, download e thumbnail
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 30 passing across 4 suites (`content-disposition.util.spec.ts`, `video-delivery.service.spec.ts`, `video-delivery.service.integration-spec.ts` against real Postgres + MinIO, `videos.module.spec.ts`); e2e `test/videos-delivery.e2e-spec.ts` 7 passing (derived from `specs/videos-delivery.plan.md`); 0 leftover objects / multipart uploads
+- **Observations:**
+  - The three routes share their decorators through `src/videos/decorators/api-delivery-redirect.decorator.ts` (`applyDecorators`: `@Redirect()`, `@Header('Cache-Control', 'private, no-store')`, the 302 response with a `Location` header, and 400/401/404/409 with `ApiErrorEnvelope`). Handlers return `HttpRedirectResponse` `{ url, statusCode: 302 }`. The e2e confirms `Cache-Control` is set on the redirect and that error responses carry no `Location`.
+  - `buildAttachmentDisposition` replaces every code point outside printable ASCII, plus `"` and `\`, with `_` in the fallback (the `u` flag makes an emoji a single `_`). It percent-encodes the exact name in `filename*` and also escapes `' ( ) *`, which `encodeURIComponent` leaves alone but RFC 5987 `attr-char` disallows. CR/LF can therefore never reach the header.
+  - Scenario 1.5 (TTL=7200) uses a second `AppModule` instance compiled after setting `process.env.S3_DELIVERY_URL_TTL_SECONDS`, the same technique as SI-03.11; all three routes carry `X-Amz-Expires=7200`.
+  - The integration and e2e tests store a 4-byte JPEG (SOI+EOI markers) as the thumbnail, since storage only needs the object and its `Content-Type`.
 
 ### SI-03.16 — Runtime do worker: consumer BullMQ, entrypoint separado e serviço Compose `video-worker`
 - **Status:** pending

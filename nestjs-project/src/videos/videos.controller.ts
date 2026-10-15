@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  type HttpRedirectResponse,
   Param,
   ParseUUIDPipe,
   Post,
@@ -19,12 +20,14 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
+import { ApiDeliveryRedirect } from './decorators/api-delivery-redirect.decorator';
 import { CreatePartUrlsDto } from './dto/create-part-urls.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
 import { PartUrlsResponseDto } from './dto/part-urls-response.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { UploadStatusResponseDto } from './dto/upload-status-response.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
+import { VideoDeliveryService } from './video-delivery.service';
 import { VideoUploadsService } from './video-uploads.service';
 import { VideosService } from './videos.service';
 
@@ -37,6 +40,7 @@ export class VideosController {
   constructor(
     private readonly videosService: VideosService,
     private readonly videoUploadsService: VideoUploadsService,
+    private readonly videoDeliveryService: VideoDeliveryService,
   ) {}
 
   @Post()
@@ -241,5 +245,45 @@ export class VideosController {
   ): Promise<VideoResponseDto> {
     const video = await this.videoUploadsService.complete(user.sub, id);
     return VideoResponseDto.fromEntity(video);
+  }
+
+  @Get(':id/stream')
+  @ApiDeliveryRedirect(
+    'Stream a video',
+    'Redirects to a presigned URL of the original file; storage serves Range requests (206), so playback never needs the whole file.',
+  )
+  async stream(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<HttpRedirectResponse> {
+    const url = await this.videoDeliveryService.getStreamUrl(user.sub, id);
+    return { url, statusCode: HttpStatus.FOUND };
+  }
+
+  @Get(':id/download')
+  @ApiDeliveryRedirect(
+    'Download a video',
+    'Redirects to a presigned URL of the original file that responds with Content-Disposition: attachment and the original file name.',
+  )
+  async download(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<HttpRedirectResponse> {
+    const url = await this.videoDeliveryService.getDownloadUrl(user.sub, id);
+    return { url, statusCode: HttpStatus.FOUND };
+  }
+
+  @Get(':id/thumbnail')
+  @ApiDeliveryRedirect(
+    'Get a video thumbnail',
+    'Redirects to a presigned URL of the JPEG thumbnail generated during processing.',
+    'VIDEO_NOT_READY — the video is not ready or has no thumbnail',
+  )
+  async thumbnail(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<HttpRedirectResponse> {
+    const url = await this.videoDeliveryService.getThumbnailUrl(user.sub, id);
+    return { url, statusCode: HttpStatus.FOUND };
   }
 }
