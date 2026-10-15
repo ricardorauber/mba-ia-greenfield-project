@@ -22,6 +22,9 @@ All commands ran inside the `nestjs-api` container, with the whole stack up and 
 
 **Deliverables checklist** in `phase-03-videos.md` ticked (20 SIs + 6 full-suite checks).
 
+
+**Post-verification adjustment (maestro review):** the brief evaluates plain `npm test` and `npm run test:e2e`. Plain `npm test` ran Jest in parallel (10 workers) and suites sharing the single test database failed, so the `test` and `test:cov` scripts now pass `--runInBand` (as `test:e2e` already did) and `nestjs-project/CLAUDE.md` says so. `auth.service.integration-spec.ts` got `jest.setTimeout(30_000)` for the cold-run hook timeout first seen in SI-03.3. Re-run: `npm test` 423/423 (50 suites), `npm run test:e2e` 93/93 (10 suites), `tsc` exit 0, lint clean. The root `CLAUDE.md` Repository Structure was also corrected (no `comments` module exists; `next-frontend/` is initialized).
+
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
 - **Tests:** no tests (Infra) — existing suites still green: 144 unit/integration (23 suites), 52 e2e (3 suites)
