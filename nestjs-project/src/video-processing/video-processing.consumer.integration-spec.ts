@@ -17,7 +17,10 @@ import { videoOriginalKey, videoPrefix } from '../videos/video-storage-keys';
 import { WorkerModule } from '../worker.module';
 import { VideoProcessingConsumer } from './video-processing.consumer';
 import { VideoProcessingProducer } from './video-processing.producer';
-import { VIDEO_PROCESSING_QUEUE } from './video-processing.queue';
+import {
+  VIDEO_PROCESSING_QUEUE,
+  VIDEO_RECONCILIATION_QUEUE,
+} from './video-processing.queue';
 
 const SETTLE_TIMEOUT_MS = 60_000;
 
@@ -65,6 +68,10 @@ describe('VideoProcessingConsumer (integration, Redis + Postgres + MinIO + FFmpe
 
   afterAll(async () => {
     await queue?.obliterate({ force: true });
+    // WorkerModule also upserts the reconcile-videos scheduler on boot
+    await module
+      ?.get<Queue>(getQueueToken(VIDEO_RECONCILIATION_QUEUE))
+      .obliterate({ force: true });
     for (const id of createdVideoIds) {
       await storage?.deletePrefix(videoPrefix(id));
     }

@@ -4,7 +4,10 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { Queue } from 'bullmq';
 import { VideoProcessingConsumer } from './video-processing/video-processing.consumer';
-import { VIDEO_PROCESSING_QUEUE } from './video-processing/video-processing.queue';
+import {
+  VIDEO_PROCESSING_QUEUE,
+  VIDEO_RECONCILIATION_QUEUE,
+} from './video-processing/video-processing.queue';
 import { WorkerModule } from './worker.module';
 
 describe('WorkerModule (integration)', () => {
@@ -45,6 +48,9 @@ describe('WorkerModule (integration)', () => {
   it('should close the worker and its connections cleanly', async () => {
     const worker = app.get(VideoProcessingConsumer).worker;
     await queue.obliterate({ force: true });
+    await app
+      .get<Queue>(getQueueToken(VIDEO_RECONCILIATION_QUEUE))
+      .obliterate({ force: true });
 
     await app.close();
 

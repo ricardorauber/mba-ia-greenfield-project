@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 16/20 completed
+**SIs:** 17/20 completed
 
 ### SI-03.1 — Infra: dependências, FFmpeg na imagem e serviços Compose (minio, minio-init, redis)
 - **Status:** completed
@@ -168,9 +168,15 @@
   - Test isolation: both worker integration specs use a unique `QUEUE_PREFIX` per file, so the running dev `video-worker` (prefix `streamtube`) never sees test jobs and vice versa; 0 leftover keys.
 
 ### SI-03.17 — Sweep de reconciliação: job scheduler `reconcile-videos`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 19 passing across 5 suites: `video-reconciliation.service.spec.ts` 6, `video-reconciliation.service.integration-spec.ts` 7 (Postgres + MinIO + Redis), `video-reconciliation.scheduler.integration-spec.ts` 1, plus the two SI-03.16 `WorkerModule` specs re-run because the worker graph changed. 0 leftover test keys / multipart uploads.
+- **Observations:**
+  - `run(now)` returns `{ abandoned, requeued }`. `abandoned` counts only drafts whose conditional `markFailed(…, 'draft')` actually applied, so a draft that a concurrent `complete` moved to `processing` is neither overwritten nor counted. An abort error other than `NoSuchUpload` (already absorbed by `StorageService.abortMultipartUpload`) is logged and that draft is skipped until the next run. An enqueue failure for a stuck video is not caught: it fails the whole reconcile job, and the next run (15 min) retries.
+  - **Race test:** "video moved to processing before the update" is simulated by wrapping the real `abortMultipartUpload` so it flips the row to `processing` after aborting; the sweep then leaves it `processing` with no `failure_reason`.
+  - The service integration spec compiles the real owning modules (`UsersModule`, `VideosModule`, `StorageModule`, `VideoProcessingQueueModule`) with **no consumers**, so enqueued jobs stay observable in Redis. It uses `UsersModule` for the `User` entity instead of a test-side patch, and a unique `QUEUE_PREFIX`.
+  - `VideoProcessingWorkerModule` now also imports `StorageModule` and registers `video-reconciliation` + `VideoReconciliationService`/`Consumer`/`Scheduler` (worker only; the API graph is unchanged). The two SI-03.16 specs that boot `WorkerModule` now also obliterate the reconciliation queue, since the scheduler upserts on every boot.
+  - **Dev stack:** after two `docker compose restart video-worker` runs, Redis holds exactly one scheduler (`streamtube:video-reconciliation:repeat` → `reconcile-videos`, name `reconcile`, `every 900000`, opts `{removeOnComplete: true, removeOnFail: 100}`), and each restart logged `Video worker shut down (SIGTERM)` then `ready`. BullMQ aligns `every` iterations to the interval, so the first sweep is a delayed job at the next boundary (~10 min after boot), not an immediate run on boot.
+  - **Cleanup:** removed 3 orphaned video prefixes from MinIO that my SI-03.16 dev-stack check created; their rows had already been wiped by test `cleanAllTables`, since tests share the dev DB.
 
 ### SI-03.19 — OpenAPI: completar schemas de vídeos e regenerar `openapi.json`
 - **Status:** pending
