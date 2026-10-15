@@ -34,6 +34,10 @@ import {
 
 const ALL_ENTITIES = [User, Channel, RefreshToken, VerificationToken];
 
+// Each describe builds a full module, syncs the schema and hashes passwords
+// with argon2; on a busy Docker VM that exceeds Jest's 5 s hook default.
+jest.setTimeout(30_000);
+
 async function createAuthTestModule(): Promise<TestingModule> {
   const ds = createTestDataSource(ALL_ENTITIES);
   return Test.createTestingModule({

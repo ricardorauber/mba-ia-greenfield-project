@@ -21,4 +21,25 @@ export const envValidationSchema = Joi.object({
   MAIL_PORT: Joi.number().default(1025),
   MAIL_FROM: Joi.string().default('"StreamTube" <noreply@streamtube.com>'),
   SWAGGER_ENABLED: Joi.string().valid('true', 'false').default('false'),
+  S3_ENDPOINT: Joi.string().uri(),
+  S3_PUBLIC_ENDPOINT: Joi.string().uri(),
+  S3_REGION: Joi.string().default('us-east-1'),
+  S3_ACCESS_KEY_ID: Joi.string().required(),
+  S3_SECRET_ACCESS_KEY: Joi.string().required(),
+  S3_BUCKET: Joi.string().default('streamtube-videos'),
+  S3_FORCE_PATH_STYLE: Joi.string().valid('true', 'false').default('true'),
+  // SigV4 presigned URLs are capped at 7 days (604800s)
+  S3_UPLOAD_PART_URL_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(604800)
+    .default(3600),
+  S3_DELIVERY_URL_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(604800)
+    .default(14400),
+  REDIS_HOST: Joi.string().default('redis'),
+  REDIS_PORT: Joi.number().port().default(6379),
+  QUEUE_PREFIX: Joi.string().default('streamtube'),
 });

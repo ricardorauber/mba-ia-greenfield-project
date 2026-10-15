@@ -79,6 +79,26 @@ describe('Swagger endpoints (e2e)', () => {
       });
     });
 
+    it('GET /api/docs-json lists the video endpoints', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/docs-json')
+        .expect(200);
+      const paths = Object.keys((res.body as { paths: object }).paths);
+
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          '/videos',
+          '/videos/{id}',
+          '/videos/{id}/upload',
+          '/videos/{id}/upload/part-urls',
+          '/videos/{id}/upload/complete',
+          '/videos/{id}/stream',
+          '/videos/{id}/download',
+          '/videos/{id}/thumbnail',
+        ]),
+      );
+    });
+
     it('GET /api/docs-yaml returns 200 with YAML content', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/docs-yaml')

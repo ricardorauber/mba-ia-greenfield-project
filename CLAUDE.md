@@ -10,9 +10,9 @@ More info in the project overview: [docs/project-plan.md](docs/project-plan.md)
 
 This is a monorepo with two main areas:
 
-- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Contains modules for users, channels, videos, comments, etc.
+- `nestjs-project/` — Backend API (NestJS 11, TypeScript, Express). Contains modules for auth, users, channels, mail, videos, storage, queue and video processing, plus the video worker entrypoint (`src/worker.ts`).
 - `docs/` — Project documentation, architecture diagrams, and planning.
-- `next-frontend/` (Next.js) — not yet initialized
+- `next-frontend/` (Next.js 16) — frontend for Phases 01–02 (auth screens and BFF Route Handlers); no video UI yet
 
 ## Architecture (C4 Container Diagram)
 
@@ -23,7 +23,7 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 - **Video Worker** (FFmpeg) → consumes jobs from queue, processes videos, updates DB and storage
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
 - **Object Storage** (S3/MinIO) → video files and thumbnails
-- **Message Queue** (TBD) → video processing job queue
+- **Message Queue** (BullMQ on Redis) → video processing job queue
 - **Email Service** (SMTP) → account confirmation and password recovery
 
 ## Docker Networking
@@ -105,3 +105,13 @@ Skip documentation lookup only for trivial operations such as:
 
 If a library is involved and there is uncertainty, documentation lookup is mandatory.
 If the documentation returned does not match the installed version, flag the discrepancy before proceeding.
+
+## Videos
+
+Phase 03 (video upload and processing) architecture. Full plan and decisions: [docs/phases/phase-03-videos/phase-03-videos.md](docs/phases/phase-03-videos/phase-03-videos.md); operational details (services, env vars, commands, tests) in `nestjs-project/CLAUDE.md` → `## Videos`.
+
+- **Queue:** BullMQ on Redis (`redis` Compose service). Queues `video-processing` (one `process-video` job per video) and `video-reconciliation` (`reconcile-videos` job scheduler, every 15 minutes).
+- **Storage:** MinIO (`pgsty/minio`, `minio` Compose service) locally, AWS S3 in production. One private bucket (`streamtube-videos` in dev) with one prefix per video: `videos/{videoId}/original` and `videos/{videoId}/thumbnail.jpg`.
+- **Upload:** resumable S3 multipart upload of up to 10 GiB in 64 MiB parts, sent by the client straight to storage through presigned URLs — the bytes never pass through the API.
+- **Worker:** the `video-worker` Compose service runs the same NestJS codebase with its own entrypoint (`src/worker.ts`, no HTTP server). It reads the metadata with ffprobe, extracts a JPEG thumbnail with ffmpeg and marks the video `ready` or `failed`.
+- **Delivery:** stream, download and thumbnail endpoints redirect (`302`) the owner to short-lived presigned URLs; storage serves `Range` requests for streaming.
